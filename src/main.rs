@@ -1,14 +1,17 @@
 use std::io::Error;
+
 mod game;
+mod objects;
 mod title;
 
-pub fn create_game() -> game::Game {
-    game::Game::new()
-}
+use game::{Game, Mediator, NotifyAction};
 
 fn main() -> Result<(), Error> {
     title::print();
-    let mut game = create_game();
-    game.run();
+    let mut game = Game::default();
+    objects::register_objects(&mut game);
+
+    game.notify_action(NotifyAction::SetLocation("forest"));
+    // GAME.run();
     Ok(())
 }

@@ -1,4 +1,3 @@
-
 pub trait FunctionTarget<T: ItemFunction> {
     fn react(&self, source: &impl T) -> Result<String, &'static str> {
         Err("Nothing happens.")
@@ -6,7 +5,7 @@ pub trait FunctionTarget<T: ItemFunction> {
 }
 
 pub trait ItemFunction<T: FunctionTarget> {
-    fn function_name() -> &'static str;
+    fn function_name() -> String;
     fn apply(&self, target: &impl T) -> Result<String, &'static str> {
         target.react(&self)
     }
@@ -41,8 +40,7 @@ impl Description for Item {
     }
 }
 
-impl FunctionTarget for Item {
-}
+impl FunctionTarget for Item {}
 
 struct Inventory {
     items: Vec<String>,

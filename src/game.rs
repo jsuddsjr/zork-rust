@@ -1,120 +1,161 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::Write;
+
+pub type Handled = bool;
+
+pub enum Direction {
+    North,
+    South,
+    East,
+    West,
+    Up,
+    Down,
+}
+
+pub enum Action {
+    Move(Box<dyn Mediated>, Direction),
+
+    Arrive(Box<dyn Mediated>),
+    Examine(Box<dyn Mediated>),
+    Follow(Box<dyn Mediated>),
+    Leave(Box<dyn Mediated>),
+    Look(Box<dyn Mediated>),
+    Read(Box<dyn Mediated>),
+    Take(Box<dyn Mediated>),
+
+    Attack(Box<dyn Mediated>, Option<Box<dyn Mediated>>),
+    Drop(Box<dyn Mediated>, Option<Box<dyn Mediated>>),
+    Light(Box<dyn Mediated>, Option<Box<dyn Mediated>>),
+    Open(Box<dyn Mediated>, Option<Box<dyn Mediated>>),
+    Use(Box<dyn Mediated>, Option<Box<dyn Mediated>>),
+
+    Die,
+    Help,
+    Inventory,
+    Quit,
+    Unknown,
+}
+
+pub enum NotifyAction {
+    SetLocation(&'static str),
+    MoveObject(&'static str, &'static str),
+    RemoveObject(&'static str),
+}
 
 // Mediator has notification methods.
 pub trait Mediator {
-    fn notify_action(&mut self, object_name: &str) -> bool;
-    fn notify_leave(&mut self, object_name: &str) -> bool;
+    fn notify_action(&mut self, action: NotifyAction) -> Handled;
 }
 
-// MediatorObject has methods called by Mediator.
-pub trait MediatorObject {
-    fn name(&self) -> &'static str;
-    fn describe(&mut self, mediator: &mut dyn Mediator) -> bool;
-    fn accepted(&mut self, mediator: &mut dyn Mediator);
-    fn removed(&mut self, mediator: &mut dyn Mediator);
-    fn leaving(&mut self, mediator: &mut dyn Mediator);
-    fn arrive(&mut self, mediator: &mut dyn Mediator);
+// Mediated has methods called by Mediator.
+pub trait Mediated {
+    fn name(&self) -> String;
+    fn loc(&self) -> String {
+        "global".into()
+    }
+    fn set_loc(&mut self, _loc: &'static str) {}
+    fn do_action(&mut self, mediator: &'static mut dyn Mediator, action: Action) -> Handled;
 }
 
 #[derive(Default)]
 pub struct Game {
-    objects: HashMap<String, Box<dyn MediatorObject>>,
-    object_queue: VecDeque<String>,
-    here: Option<String>, // current location
-    prsa: Option<String>, // action
-    prso: Option<String>, // direct object
-    prsi: Option<String>, // indirect object
+    objects: HashMap<String, Box<dyn Mediated>>, // all objects
+    here_objects: Vec<Box<dyn Mediated>>,        // objects in current location
+    here: Option<Box<dyn Mediated>>,             // current location
 }
 
 impl Mediator for Game {
-    fn notify_action(&mut self, object_name: &str) -> bool {
-        // if self.object_on_platform.is_some() {
-        //     self.object_queue.push_back(object_name.into());
-        //     false
-        // } else {
-        //     self.object_on_platform.replace(object_name.into());
-        //     true
-        // }
-        false
-    }
+    fn notify_action(&mut self, action: NotifyAction) -> Handled {
+        match action {
+            NotifyAction::SetLocation(name) => {
+                if let Some(value) = self.validate_loc(name) {
+                    return value;
+                }
 
-    fn notify_leave(&mut self, object_name: &str) -> bool {
-        // if Some(object_name.into()) == self.object_on_platform {
-        //     self.object_on_platform = None;
+                self.here_objects.clear();
+                self.here.replace(self.objects.get(name).unwrap().clone());
+                for o in self.objects.values() {
+                    if o.loc() == name {
+                        self.here_objects.push(o);
+                    }
+                }
+                return true;
+            }
 
-        //     if let Some(next_object_name) = self.object_queue.pop_front() {
-        //         let mut next_object = self.objects.remove(&next_object_name).unwrap();
-        //         next_object.arrive(self);
-        //         self.objects.insert(next_object_name.clone(), next_object);
+            NotifyAction::MoveObject(object_name, new_loc) => {
+                if let Some(value) = self.validate_loc(new_loc) {
+                    return value;
+                }
+                if self.objects.contains_key(object_name) {
+                    let mut o = self.objects.get(object_name).unwrap().clone();
+                    o.set_loc(new_loc);
+                    if new_loc == self.here.unwrap().loc() {
+                        self.here_objects.push(o);
+                    }
+                    return true;
+                }
+            }
 
-        //         self.object_on_platform = Some(next_object_name);
-        //     }
-        // }
+            NotifyAction::RemoveObject(object_name) => {
+                if let Some(_) = self.objects.remove(object_name) {
+                    return true;
+                }
+            }
+        }
         false
     }
 }
 
 impl Game {
-    pub fn new() -> Self {
-        Game {
-            objects: HashMap::new(),
-            object_queue: VecDeque::new(),
-            here: None,
-            prsa: None,
-            prso: None,
-            prsi: None,
-        }
-    }
-
-    pub fn accept(&mut self, mut object: impl MediatorObject + 'static) {
-        if self.objects.contains_key(object.name()) {
-            println!("cannot accept duplicate object: '{}'", object.name());
+    pub fn add(&mut self, object: impl Mediated + 'static) {
+        if self.objects.contains_key(object.name().as_str()) {
+            println!("cannot add duplicate object: '{}'", object.name());
             return;
         }
-        object.accepted(self);
-        self.objects
-            .insert(object.name().to_string(), Box::new(object));
+        self.objects.insert(object.name(), Box::new(object));
     }
 
-    pub fn remove(&mut self, name: &'static str) {
-        let object = self.objects.remove(name);
-        if let Some(mut object) = object {
-            object.removed(self);
-        } else {
-            println!("cannot remove unknown object: '{}'", name);
-        }
-    }
-
-    pub fn get_input(&mut self) {
-        let mut input = String::new();
-        std::io::stdin()
-            .read_line(&mut input)
-            .expect("failed to read line");
-
-        let mut words = input.split_whitespace();
-        self.prsa = words.next().map(|x| x.to_string());
-        self.prso = words.next().map(|x| x.to_string());
-        self.prsi = words.next().map(|x| x.to_string());
+    pub fn print_death(&self) {
+        println!("**That would lead to your untimely demise.**\n\nTry again?");
     }
 
     pub fn print_help(&self) {
-        println!("help");
+        println!("Try these commands:\nLOOK\nMOVE\nTAKE\nDROP\nINV\nQUIT");
+    }
+
+    pub fn print_location(&self) {
+        println!("You are in {}", self.here.unwrap().name());
+        println!("You see:");
+        for o in &self.here_objects {
+            println!("  {}", o.name());
+        }
     }
 
     //Parser reads vector of tokens from stdin and returns Tuple(PRSA, PRSO, PRSI).
     //PRSA is the action, PRSO direct object, and PRSI indirect object of the typed command.
-    //The parser is responsible for converting the tokens into a PRSA, PRSO, PRSI tuple.
-    //The parser is also responsible for checking the validity of the command.
-    pub fn parse_command(&self) -> (String, Option<String>, Option<String>) {
-        print!("(action) (direct object) (indirect object)> ");
+    pub fn input_command(&self) -> (String, Option<String>, Option<String>) {
+        print!("\naction (object) (indirect)> ");
         std::io::stdout().flush().ok();
 
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
 
         let mut tokens = Vec::new();
-        for token in input.split_whitespace() {
+        let lower = input.to_lowercase();
+        for token in lower.split_whitespace() {
+            if token == "the"
+                || token == "a"
+                || token == "an"
+                || token == "with"
+                || token == "on"
+                || token == "from"
+                || token == "into"
+                || token == "to"
+                || token == "at"
+                || token == "of"
+            {
+                continue;
+            }
             tokens.push(token);
         }
         if tokens.len() == 1 {
@@ -133,17 +174,38 @@ impl Game {
         ("help".to_string(), None, None)
     }
 
-    pub fn run(&mut self) {
-        if self.here == None {
-            println!("cannot run without a location. use 'move' first.");
-            return;
-        }
+    fn parse_command(&self, command: (String, Option<String>, Option<String>)) -> Action {
+        let (prsa, _prso, _prsi) = command;
+        match prsa.as_str() {
+            "help" => return Action::Help,
+            "quit" => return Action::Quit,
+            &_ => return Action::Unknown,
+        };
+    }
 
-        println!("{}", self.here.as_mut().unwrap());
+    fn validate_loc(&self, name: &str) -> Option<bool> {
+        if (self.here.is_some() && self.here.unwrap().name() == name)
+            || !self.objects.contains_key(name)
+        {
+            return Some(false);
+        }
+        None
+    }
+
+    pub fn run(&self) {
+        // if self.here.is_none() {
+        //     println!("No location set. Use 'move' first.");
+        //     return;
+        // }
 
         loop {
-            let _command = self.parse_command();
-            // self.do_command();
+            let action = self.parse_command(self.input_command());
+            match action {
+                Action::Die => self.print_death(),
+                Action::Help => self.print_help(),
+                Action::Quit => break,
+                _ => println!("I didn't understand that. Have you tried 'help'?"),
+            }
         }
     }
 }
