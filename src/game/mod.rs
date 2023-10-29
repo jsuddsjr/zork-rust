@@ -3,13 +3,14 @@ pub mod objects;
 pub mod parser;
 pub mod title;
 
-pub use game::Game;
+pub use game::{Game, GameAtlas, GameContext};
 pub use objects::forest::{Forest, Key, Leaves};
 pub use objects::kitchen::{Kitchen, Knife};
+use std::collections::HashMap;
 
-use self::game::GameAtlas;
-use self::objects::kitchen::{Bread, BreadBox};
 pub type Handled = bool;
+
+#[derive(Debug, PartialEq)]
 
 pub enum Direction {
     North,
@@ -22,6 +23,7 @@ pub enum Direction {
     Enter,
 }
 
+#[derive(Debug, PartialEq)]
 // Actions are created by the parser.
 pub enum Action {
     Go(Direction), // handled by "here" object, which calls SetLocation on mediator if successful.
@@ -90,23 +92,11 @@ pub trait GameObject {
         String::from("nowhere")
     }
     fn set_loc(&mut self, loc: String) {}
-    fn act(&mut self, mediator: &'static mut dyn Mediator, action: Action) -> Handled;
     fn can_do(&self, action: &Action) -> bool {
         false
     }
-}
-
-pub fn create_game() -> Box<Game> {
-    let mut atlas = GameAtlas::new();
-    atlas.add(Forest::default());
-    atlas.add(Leaves::default());
-    atlas.add(Key::new());
-    atlas.add(Kitchen::default());
-    atlas.add(Knife::new());
-    atlas.add(Bread::new());
-    atlas.add(BreadBox::new());
-
-    let loc: String = Forest::default().name();
-    let game = Box::new(Game::new(loc, atlas));
-    game
+    fn act(&mut self, mediator: &'static mut dyn Mediator, action: Action) -> Handled;
+    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
+        None
+    }
 }

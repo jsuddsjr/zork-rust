@@ -28,6 +28,45 @@ impl GameObject for Kitchen {
 }
 
 #[derive(Clone, Default)]
+pub struct Sink {
+    name: String,
+    loc: String,
+}
+
+impl Sink {
+    pub fn new() -> Self {
+        Self {
+            name: "sink".to_string(),
+            loc: Kitchen::default().name(),
+        }
+    }
+}
+
+impl GameObject for Sink {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn loc(&self) -> String {
+        self.loc.clone()
+    }
+
+    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+        match action {
+            Action::Describe(_) => {
+                println!("A sink full of dirty dishes.");
+                true
+            }
+            Action::Examine(_) => {
+                println!("The dishes are covered in mold. You can't tell what they were originally. Wait... is that a knife?");
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct Knife {
     name: String,
     loc: String,
@@ -37,7 +76,7 @@ impl Knife {
     pub fn new() -> Self {
         Self {
             name: "knife".to_string(),
-            loc: Kitchen::default().name(),
+            loc: Sink::default().name(),
         }
     }
 }
@@ -58,7 +97,8 @@ impl GameObject for Knife {
     fn can_do(&self, action: &Action) -> bool {
         match action {
             Action::Take(_) => true,
-            Action::Attack(target, _) => *target == Bread::default().name(),
+            Action::Use(_, _) => true,
+            Action::Attack(_, _) => true,
             _ => false,
         }
     }
@@ -73,12 +113,18 @@ impl GameObject for Knife {
                 println!("It won't slay a dragon, but it might work on bread.");
                 true
             }
-            Action::Take(_) => true,
-            Action::Attack(target, _) => {
+            Action::Take(_) => {
+                println!(
+                    "You reach in gingerly and take the knife, barely resisting the urge to vomit."
+                );
+                true
+            }
+            Action::Use(target, _) | Action::Attack(target, _) => {
                 if target == Bread::default().name() {
-                    println!("You slice the crusty loaf clean in two. Take that you vile loaf!!");
+                    println!("You hack the crusty loaf clean in two. Take that you vile loaf!!");
                     true
                 } else {
+                    println!("Are you serious? You can't use a knife on that.");
                     false
                 }
             }
@@ -156,6 +202,14 @@ impl GameObject for Bread {
         self.loc.clone()
     }
 
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Take(_) => true,
+            Action::Attack(_, _) => true,
+            _ => false,
+        }
+    }
+
     fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
@@ -170,7 +224,7 @@ impl GameObject for Bread {
                 if attacker.is_none() {
                     println!("You punch the bread and scrape your knuckles badly. Ouch!");
                 } else {
-                    println!("The loaf withstands the {}.", attacker.unwrap());
+                    println!("The loaf resists the {}.", attacker.unwrap());
                 }
                 false
             }

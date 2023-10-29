@@ -251,3 +251,66 @@ impl Parser {
         return self.to_action(token, context);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::objects::kitchen::Kitchen;
+
+    #[test]
+    fn test_parser() {
+        let parser = Parser::new();
+        let context = GameContext::new(String::new());
+        let token: Token = Token::from_action("?");
+        let action = parser.to_action(token, &context);
+        assert_eq!(action, Action::Help);
+    }
+
+    #[test]
+    fn test_parser_go() {
+        let parser = Parser::new();
+        let context = GameContext::new("kitchen".to_string());
+        let action = parser.input_action(&context);
+        assert_eq!(action, Action::Help);
+    }
+
+    // #[test]
+    // fn test_parser_go_north() {
+    //     let parser = Parser::new();
+    //     let context = GameContext::new();
+    //     let action = parser.input_action(&context);
+    //     assert_eq!(action, Action::Help);
+    // }
+
+    // #[test]
+    // fn test_parser_go_north_to() {
+    //     let parser = Parser::new();
+    //     let context = GameContext::new();
+    //     let action = parser.input_action(&context);
+    //     assert_eq!(action, Action::Help);
+    // }
+
+    // #[test]
+    // fn test_parser_go_north_to_living_room() {
+    //     let parser = Parser::new();
+    //     let context = GameContext::new();
+    //     let action = parser.input_action(&context);
+    //     assert_eq!(action, Action::Help);
+    // }
+
+    // #[test]
+    // fn test_parser_go_north_to_living_room_with() {
+    //     let parser = Parser::new();
+    //     let context = GameContext::new();
+    //     let action = parser.input_action(&context);
+    //     assert_eq!(action, Action::Help);
+    // }
+
+    // #[test]
+    // fn test_parser_go_north_to_living_room_with_key() {
+    //     let parser = Parser::new();
+    //     let context = GameContext::new();
+    //     let action = parser.input_action(&context);
+    //     assert_eq!(action, Action::Help);
+    // }
+}
