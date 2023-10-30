@@ -1,7 +1,28 @@
 use crate::game::{Action, GameObject, Handled, Location, Mediator, NotifyAction};
+use std::collections::HashMap;
 
 #[derive(Clone, Default)]
-pub struct Kitchen;
+pub struct Kitchen {
+    name: String,
+    loc: String,
+    objects: Option<HashMap<String, Box<dyn GameObject>>>,
+}
+
+impl Kitchen {
+    pub fn new() -> Self {
+        let mut objects: HashMap<String, Box<dyn GameObject>> = HashMap::new();
+        objects.insert(Sink::new().name(), Box::new(Sink::new()));
+        objects.insert(Knife::new().name(), Box::new(Knife::new()));
+        objects.insert(BreadBox::new().name(), Box::new(BreadBox::new()));
+        objects.insert(Bread::new().name(), Box::new(Bread::new()));
+
+        Self {
+            name: "kitchen".to_string(),
+            loc: "forest".to_string(),
+            objects: Some(objects),
+        }
+    }
+}
 
 impl GameObject for Kitchen {
     fn name(&self) -> String {
@@ -15,7 +36,7 @@ impl GameObject for Kitchen {
                 true
             }
             Action::Leave(_) => {
-                mediator.notify(NotifyAction::Set(Location::To("forest")));
+                // mediator.notify(NotifyAction::Set(Location::To("forest")));
                 true
             }
             Action::Describe(_) => {
@@ -24,6 +45,10 @@ impl GameObject for Kitchen {
             }
             _ => false,
         }
+    }
+
+    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
+        self.objects
     }
 }
 

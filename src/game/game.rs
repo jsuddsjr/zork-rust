@@ -91,43 +91,43 @@ impl Game {
 
     pub fn next_context(&mut self, name: String) {
         let mut context = Box::new(GameContext::new(name.clone()));
-        if let Some(o) = self.atlas.get(&name) {
-            // Bring inventory into "here" scope.
-            context.locals.clone_from(&self.context.inv);
-            // Bring objects into "here" scope.
-            context
-                .locals
-                .extend(self.atlas.values().into_iter().filter_map(|o| {
-                    if o.loc() == name {
-                        Some((o.name(), *o))
-                    } else {
-                        None
-                    }
-                }));
-            // Alias.
-            context.inv = self.context.inv;
-        }
+        // if let Some(o) = self.atlas.get(&name) {
+        //     // Bring inventory into "here" scope.
+        //     context.locals.clone_from(&self.context.inv);
+        //     // Bring objects into "here" scope.
+        //     context
+        //         .locals
+        //         .extend(self.atlas.values().into_iter().filter_map(|o| {
+        //             if o.loc() == name {
+        //                 Some((o.name(), *o))
+        //             } else {
+        //                 None
+        //             }
+        //         }));
+        //     // Alias.
+        //     context.inv = self.context.inv;
+        // }
         self.context = context;
     }
 
     fn move_object(&'static mut self, object_name: String, location: Location) -> bool {
         if let Some(o) = self.atlas.get(&object_name) {
-            match location {
-                Location::Local => {
-                    o.set_loc(self.context.here());
-                    self.context.locals.insert(o.name(), *o);
-                    return true;
-                }
-                Location::Inventory => {
-                    o.set_loc("inv".to_string());
-                    self.context.inv.insert(o.name(), *o);
-                    return true;
-                }
-                Location::To(name) => {
-                    o.set_loc(name.to_string());
-                    return true;
-                }
-            }
+            // match location {
+            //     Location::Local => {
+            //         o.set_loc(self.context.here());
+            //         self.context.locals.insert(o.name(), *o);
+            //         return true;
+            //     }
+            //     Location::Inventory => {
+            //         o.set_loc("inv".to_string());
+            //         self.context.inv.insert(o.name(), *o);
+            //         return true;
+            //     }
+            //     Location::To(name) => {
+            //         o.set_loc(name.to_string());
+            //         return true;
+            //     }
+            // }
         }
         false
     }

@@ -84,16 +84,16 @@ impl GameObject for Key {
         self.loc = loc;
     }
 
-    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("A shiny key glints in the grass.");
-                mediator.notify(NotifyAction::Move("key", Location::Local));
+                // mediator.notify(NotifyAction::Move("key", Location::Local));
                 true
             }
             Action::Take(_) => {
                 println!("You take the key.");
-                mediator.notify(NotifyAction::Move("key", Location::Inventory));
+                // mediator.notify(NotifyAction::Move("key", Location::Inventory));
                 true
             }
             _ => false,

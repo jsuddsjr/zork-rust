@@ -86,7 +86,7 @@ pub trait Mediator {
 }
 
 #[allow(unused_variables)]
-pub trait GameObject {
+pub trait GameObject: Clone {
     fn name(&self) -> String;
     fn loc(&self) -> String {
         String::from("nowhere")
@@ -96,6 +96,24 @@ pub trait GameObject {
         false
     }
     fn act(&mut self, mediator: &'static mut dyn Mediator, action: Action) -> Handled;
+    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
+        None
+    }
+}
+
+impl GameObject for Box<dyn GameObject> {
+    fn name(&self) -> String {
+        (**self).name()
+    }
+
+    fn set_loc(&mut self, loc: String) {
+        (**self).set_loc(loc)
+    }
+
+    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> bool {
+        (**self).act(mediator, action)
+    }
+
     fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
         None
     }
