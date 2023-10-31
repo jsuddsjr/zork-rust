@@ -57,17 +57,26 @@ impl GameAtlas {
             .collect()
     }
 
+    pub fn get_inventory(&self) -> Vec<&'_ Box<dyn GameObject>> {
+        self.atlas
+            .iter()
+            .filter_map(|(_k, v)| if v.loc() == "inv" { Some(v) } else { None })
+            .collect()
+    }
+
     pub fn invoke<'me, 'a>(
         &'me mut self,
         mediator: &'a mut dyn Mediator<'a>,
-        object_name: String,
+        object_name: Option<String>,
         action: Action,
     ) -> Handled
     where
         'me: 'a,
     {
-        if let Some(o) = self.atlas.get_mut(&object_name) {
-            return o.act(action.clone()) || o.act_react(mediator, action);
+        if object_name.is_some() {
+            if let Some(o) = self.atlas.get_mut(&object_name.unwrap()) {
+                return o.act(action.clone()) || o.act_react(mediator, action);
+            }
         }
         false
     }
@@ -75,10 +84,9 @@ impl GameAtlas {
 
 #[derive(Default)]
 pub struct GameContext<'a> {
-    here: String,                                     // current location
-    vec: Option<&'a Vec<Box<dyn GameObject>>>,        // objects in current location
-    locals: HashMap<String, &'a Box<dyn GameObject>>, // objects in current location
-    inv: HashMap<String, &'a Box<dyn GameObject>>,    // objects carried to next location
+    here: String,                         // current location
+    locals: Vec<&'a Box<dyn GameObject>>, // objects in current location
+    inv: Vec<&'a Box<dyn GameObject>>,    // objects carried to next location
 }
 
 impl<'a> GameContext<'a> {
@@ -207,23 +215,53 @@ impl<'a> Game<'a> {
         false
     }
 
-    pub fn print_death(&self) {
+    pub fn print_death(&self) -> Handled {
         println!("**That would lead to your untimely demise.**\n\nTry again?");
+        true
     }
 
-    pub fn print_help(&self) {
+    pub fn print_help(&self) -> Handled {
         println!("Try these commands:\nLOOK\nMOVE\nTAKE\nDROP\nINV\nQUIT");
+        true
     }
 
-    pub fn print_location(&self) {
+    pub fn print_location(&self) -> Handled {
         println!("You are in {}", self.context.here);
         println!("You see:");
         for o in self.context.locals.values() {
             println!("  {}", o.name());
         }
+        true
     }
 
-    pub fn run(&self) {
+    pub fn print_inventory(&self) -> Handled {
+        println!("You are carrying:");
+        for o in self.context.inv.values() {
+            println!("  {}", o.name());
+        }
+        true
+    }
+
+    pub fn try_invoke_one(&'a mut self, object_name: Option<String>, action: Action) -> Handled {
+        self.atlas.invoke(self, object_name, action)
+    }
+
+    pub fn try_invoke(
+        &'a mut self,
+        action: Action,
+        prso: Option<String>,
+        prsi: Option<String>,
+    ) -> Handled {
+        let here = Some(self.context.here());
+        let mut atlas: &'a mut GameAtlas = &mut self.atlas;
+        let mediator = self as &mut dyn Mediator;
+
+        atlas.invoke(self, prsi, action.clone())
+            || atlas.invoke(self, prso, action.clone())
+            || atlas.invoke(self, here, action.clone())
+    }
+
+    pub fn run(&mut self) {
         // if self.context.here.is_none() {
         //     println!("No location set. Use 'move' first.");
         //     return;
@@ -233,12 +271,36 @@ impl<'a> Game<'a> {
 
         loop {
             let action = parser.input_action(&self.context);
-            match action {
-                Action::Describe(_) => self.print_location(),
+            let handled: Handled = match action.clone() {
                 Action::Die => self.print_death(),
                 Action::Help => self.print_help(),
                 Action::Quit => break,
-                _ => println!("I didn't understand that. Have you tried 'help'?"),
+                Action::Go(_) => self.atlas.invoke(self, Some(self.context.here()), action),
+                Action::Climb(prso)
+                | Action::Describe(prso)
+                | Action::Examine(prso)
+                | Action::Listen(prso)
+                | Action::Follow(prso)
+                | Action::Take(prso) => self.try_invoke(action, prso, None),
+                Action::Attack(prso, prsi)
+                | Action::Drop(prso, prsi)
+                | Action::Light(prso, prsi)
+                | Action::Open(prso, prsi)
+                | Action::Read(prso, prsi)
+                | Action::Say(prso, prsi)
+                | Action::Use(prso, prsi) => self.try_invoke(action, Some(prso), prsi),
+                Action::UnknownAction(action) => {
+                    println!("I don't know how to {}", action);
+                    false
+                }
+                Action::AmbiguousObject(objects) => {
+                    println!("Which {} do you mean?", objects.join(", "));
+                    false
+                }
+                _ => false,
+            };
+            if !handled {
+                println!("I didn't understand that. Have you tried 'help'?");
             }
         }
     }
