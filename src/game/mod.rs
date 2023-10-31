@@ -24,6 +24,7 @@ pub enum Direction {
 }
 
 #[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 // Actions are created by the parser.
 pub enum Action {
     Go(Direction), // handled by "here" object, which calls SetLocation on mediator if successful.
@@ -99,5 +100,18 @@ pub trait GameObject {
         false
     }
 
-    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> Handled;
+    fn act(&mut self, action: Action) -> Handled {
+        false
+    }
+
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
+        false
+    }
 }

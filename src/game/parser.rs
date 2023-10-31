@@ -5,7 +5,7 @@ use std::io::{stdin, stdout, Write};
 
 static SKIP_WORDS: [&str; 9] = ["a", "an", "at", "here", "of", "out", "the", "to", "with"];
 
-static POSITION_WORDS: [&str; 10] = [
+static _POSITION_WORDS: [&str; 10] = [
     "above", "behind", "below", "beside", "beyond", "in", "inside", "near", "on", "under",
 ];
 
@@ -55,6 +55,7 @@ static POSITION_WORDS: [&str; 10] = [
 //     "way",
 // ];
 
+#[derive(Debug)]
 pub struct Token {
     pub prsa: String,
     pub prso: Option<String>,
@@ -62,6 +63,7 @@ pub struct Token {
 }
 
 impl Token {
+    #[allow(dead_code)]
     pub fn new(prsa: String, prso: Option<String>, prsi: Option<String>) -> Self {
         Self { prsa, prso, prsi }
     }
@@ -87,10 +89,6 @@ impl Token {
 pub struct Parser;
 
 impl Parser {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     //Parser reads vector of tokens from stdin and returns Tuple(PRSA, PRSO, PRSI).
     //PRSA is the action, PRSO direct object, and PRSI indirect object of the typed command.
     fn input_command(&self) -> Token {
@@ -134,17 +132,6 @@ impl Parser {
         for (key, obj) in map.iter() {
             if obj.can_do(action) {
                 matches.push(key.clone());
-            }
-        }
-        matches
-    }
-
-    fn get_matches(&self, name: &str, map: &HashMap<String, Box<dyn GameObject>>) -> Vec<String> {
-        let mut matches: Vec<String> = Vec::new();
-        // get matching objects
-        for (key, obj) in map.iter() {
-            if key.contains(name) {
-                matches.push(obj.name());
             }
         }
         matches
@@ -254,12 +241,13 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
+    use crate::game::objects::kitchen;
+
     use super::*;
-    use crate::game::objects::kitchen::Kitchen;
 
     #[test]
     fn test_parser() {
-        let parser = Parser::new();
+        let parser = Parser::default();
         let context = GameContext::new(String::new());
         let token: Token = Token::from_action("?");
         let action = parser.to_action(token, &context);
@@ -267,11 +255,19 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_go() {
-        let parser = Parser::new();
-        let context = GameContext::new("kitchen".to_string());
-        let action = parser.input_action(&context);
-        assert_eq!(action, Action::Help);
+    fn test_parser_look() {
+        let mut vec = Vec::new() as Vec<Box<dyn GameObject>>;
+        kitchen::create(&mut vec);
+
+        let mut context = GameContext::new(vec[0].name());
+        context.set_locals(&vec);
+
+        let sink = Some(vec[1].name());
+
+        let parser = Parser::default();
+        let token = Token::new("look".to_string(), sink.clone(), None);
+        let action = parser.to_action(token, &context);
+        assert_eq!(action, Action::Examine(sink));
     }
 
     // #[test]

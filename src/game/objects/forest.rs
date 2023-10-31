@@ -1,5 +1,11 @@
 use crate::game::{Action, Direction, GameObject, Handled, Location, Mediator, NotifyAction};
 
+pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
+    vec.push(Box::new(Forest::default()));
+    vec.push(Box::new(Leaves::default()));
+    vec.push(Box::new(Key::new()));
+}
+
 #[derive(Default)]
 pub struct Forest;
 
@@ -8,10 +14,18 @@ impl GameObject for Forest {
         "forest".to_string()
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Go(Direction::North) => {
                 println!("You follow the path north.");
+                mediator.notify(NotifyAction::Set(Location::To("kitchen".to_string())));
                 true
             }
             Action::Describe(_) => {
@@ -43,7 +57,7 @@ impl GameObject for Leaves {
         Forest::default().name()
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act(&mut self, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("You see a pile of leaves.");
@@ -84,18 +98,32 @@ impl GameObject for Key {
         self.loc = loc;
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Describe(_) => {
                 println!("A shiny key glints in the grass.");
-                // mediator.notify(NotifyAction::Move("key", Location::Local));
+                mediator.notify(NotifyAction::Move(self.name(), Location::Local));
                 true
             }
             Action::Take(_) => {
                 println!("You take the key.");
-                // mediator.notify(NotifyAction::Move("key", Location::Inventory));
+                mediator.notify(NotifyAction::Move(self.name(), Location::Inventory));
                 true
             }
+            _ => false,
+        }
+    }
+
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Take(_) => true,
             _ => false,
         }
     }

@@ -82,6 +82,14 @@ impl<'a> GameContext<'a> {
         &self.locals
     }
 
+    #[allow(dead_code)]
+    pub fn set_locals(&mut self, locals: &'a Vec<Box<dyn GameObject>>) {
+        self.locals.clear();
+        locals.into_iter().for_each(|o| {
+            self.locals.insert(o.name(), &o);
+        });
+    }
+
     pub fn add_local(&mut self, object: &'a Box<dyn GameObject>) {
         if let Some(o) = self.inv.remove(&object.name()) {
             println!("** {} removed from {}", o.name(), o.loc());
@@ -204,6 +212,7 @@ impl<'a> Game<'a> {
         loop {
             let action = parser.input_action(&self.context);
             match action {
+                Action::Describe(_) => self.print_location(),
                 Action::Die => self.print_death(),
                 Action::Help => self.print_help(),
                 Action::Quit => break,

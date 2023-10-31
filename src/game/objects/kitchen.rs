@@ -1,11 +1,17 @@
 use crate::game::{Action, GameObject, Handled, Location, Mediator, NotifyAction};
 use std::collections::HashMap;
 
+pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
+    vec.push(Box::new(Kitchen::new()));
+    vec.push(Box::new(Sink::new()));
+    vec.push(Box::new(Knife::new()));
+    vec.push(Box::new(BreadBox::new()));
+    vec.push(Box::new(Bread::new()));
+}
+
 #[derive(Default)]
 pub struct Kitchen {
     name: String,
-    loc: String,
-    objects: Option<HashMap<String, Box<dyn GameObject>>>,
 }
 
 impl Kitchen {
@@ -18,25 +24,30 @@ impl Kitchen {
 
         Self {
             name: "kitchen".to_string(),
-            loc: "forest".to_string(),
-            objects: Some(objects),
         }
     }
 }
 
 impl GameObject for Kitchen {
     fn name(&self) -> String {
-        "kitchen".to_string()
+        self.name.clone()
     }
 
-    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Arrive(_) => {
                 println!("Eww... What's that smell?");
                 true
             }
             Action::Leave(_) => {
-                // mediator.notify(NotifyAction::Set(Location::To("forest")));
+                mediator.notify(NotifyAction::Set(Location::To("forest".to_string())));
                 true
             }
             Action::Describe(_) => {
@@ -46,10 +57,6 @@ impl GameObject for Kitchen {
             _ => false,
         }
     }
-
-    // fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
-    //     self.objects
-    // }
 }
 
 #[derive(Default)]
@@ -76,7 +83,7 @@ impl GameObject for Sink {
         self.loc.clone()
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act(&mut self, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("A sink full of dirty dishes.");
@@ -128,7 +135,14 @@ impl GameObject for Knife {
         }
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Describe(_) => {
                 println!("A rusty knife.");
@@ -142,6 +156,7 @@ impl GameObject for Knife {
                 println!(
                     "You reach in gingerly and take the knife, barely resisting the urge to vomit."
                 );
+                mediator.notify(NotifyAction::Move(self.name(), Location::Inventory));
                 true
             }
             Action::Use(target, _) | Action::Attack(target, _) => {
@@ -184,7 +199,14 @@ impl GameObject for BreadBox {
         self.loc.clone()
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Describe(_) => {
                 if self.contains_bread {
@@ -194,10 +216,27 @@ impl GameObject for BreadBox {
                 }
                 true
             }
+            Action::Open(_, _) => {
+                if self.contains_bread {
+                    println!("You open the breadbox and take the loaf of bread.");
+                    mediator.notify(NotifyAction::Move("bread".to_string(), Location::Inventory));
+                    self.contains_bread = false;
+                } else {
+                    println!("It's empty.");
+                }
+                true
+            }
             Action::Examine(_) => {
                 println!("It's a breadbox.");
                 true
             }
+            _ => false,
+        }
+    }
+
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Open(_, _) => true,
             _ => false,
         }
     }
@@ -235,7 +274,7 @@ impl GameObject for Bread {
         }
     }
 
-    fn act(&mut self, _mediator: &mut dyn Mediator, action: Action) -> Handled {
+    fn act(&mut self, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("It's a loaf of bread, very stale.");
