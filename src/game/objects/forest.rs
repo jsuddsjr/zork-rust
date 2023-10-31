@@ -1,6 +1,6 @@
 use crate::game::{Action, Direction, GameObject, Handled, Location, Mediator, NotifyAction};
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Forest;
 
 impl GameObject for Forest {
@@ -31,7 +31,7 @@ impl GameObject for Forest {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Leaves;
 
 impl GameObject for Leaves {
@@ -58,7 +58,7 @@ impl GameObject for Leaves {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Key {
     loc: String,
 }

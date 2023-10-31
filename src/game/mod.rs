@@ -5,8 +5,8 @@ pub mod title;
 
 pub use game::{Game, GameAtlas, GameContext};
 pub use objects::forest::{Forest, Key, Leaves};
-pub use objects::kitchen::{Kitchen, Knife};
-use std::collections::HashMap;
+pub use objects::kitchen::{Bread, BreadBox, Kitchen, Knife, Sink};
+pub use parser::Token;
 
 pub type Handled = bool;
 
@@ -72,49 +72,32 @@ pub enum Action {
 pub enum Location {
     Local,
     Inventory,
-    To(&'static str),
+    To(String),
 }
 
 pub enum NotifyAction {
-    Set(Location),                // game location
-    Move(&'static str, Location), // object name, new location
+    Set(Location),          // game location
+    Move(String, Location), // object name, new location
 }
 
 // Mediator has notification methods.
-pub trait Mediator {
-    fn notify(&'static mut self, action: NotifyAction) -> Handled;
+pub trait Mediator<'a> {
+    fn notify(&'a mut self, action: NotifyAction) -> Handled;
 }
 
 #[allow(unused_variables)]
-pub trait GameObject: Clone {
+pub trait GameObject {
     fn name(&self) -> String;
+
     fn loc(&self) -> String {
         String::from("nowhere")
     }
+
     fn set_loc(&mut self, loc: String) {}
+
     fn can_do(&self, action: &Action) -> bool {
         false
     }
-    fn act(&mut self, mediator: &'static mut dyn Mediator, action: Action) -> Handled;
-    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
-        None
-    }
-}
 
-impl GameObject for Box<dyn GameObject> {
-    fn name(&self) -> String {
-        (**self).name()
-    }
-
-    fn set_loc(&mut self, loc: String) {
-        (**self).set_loc(loc)
-    }
-
-    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> bool {
-        (**self).act(mediator, action)
-    }
-
-    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
-        None
-    }
+    fn act(&mut self, mediator: &mut dyn Mediator, action: Action) -> Handled;
 }

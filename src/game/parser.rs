@@ -127,7 +127,7 @@ impl Parser {
     fn get_targets(
         &self,
         action: &Action,
-        map: &HashMap<String, Box<dyn GameObject>>,
+        map: &HashMap<String, &Box<dyn GameObject>>,
     ) -> Vec<String> {
         let mut matches: Vec<String> = Vec::new();
         // get all objects that can do action
@@ -174,7 +174,7 @@ impl Parser {
                 } else {
                     // Otherwise, find a target that can be used.
                     let action = Action::Use("".to_string(), Some(o.clone()));
-                    let targets = self.get_targets(&action, &context.locals);
+                    let targets = self.get_targets(&action, context.locals());
                     if targets.len() == 1 {
                         Action::Use(targets[0].clone(), Some(o))
                     } else if targets.len() > 1 {

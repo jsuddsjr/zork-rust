@@ -1,7 +1,7 @@
 use crate::game::{Action, GameObject, Handled, Location, Mediator, NotifyAction};
 use std::collections::HashMap;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Kitchen {
     name: String,
     loc: String,
@@ -47,12 +47,12 @@ impl GameObject for Kitchen {
         }
     }
 
-    fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
-        self.objects
-    }
+    // fn objects(&self) -> Option<HashMap<String, Box<dyn GameObject>>> {
+    //     self.objects
+    // }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Sink {
     name: String,
     loc: String,
@@ -91,7 +91,7 @@ impl GameObject for Sink {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Knife {
     name: String,
     loc: String,
@@ -158,7 +158,7 @@ impl GameObject for Knife {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct BreadBox {
     name: String,
     loc: String,
@@ -203,7 +203,7 @@ impl GameObject for BreadBox {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Bread {
     name: String,
     loc: String,
@@ -242,7 +242,7 @@ impl GameObject for Bread {
                 true
             }
             Action::Examine(_) => {
-                println!("The crust is so dry and hard that you'd probably break a tooth trying to eat it.");
+                println!("The crust is so dry and hard that you'd break a tooth trying to eat it.");
                 true
             }
             Action::Attack(_, attacker) => {
