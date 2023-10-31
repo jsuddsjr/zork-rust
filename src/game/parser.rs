@@ -241,9 +241,84 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::objects::kitchen;
+    use crate::game::{objects::kitchen, Handled, Location, Mediator, NotifyAction};
 
     use super::*;
+
+    #[derive(Default)]
+    struct MockGame<'a> {
+        context: GameContext<'a>,
+        called: bool,
+        obj: String,
+        loc: String,
+    }
+
+    impl<'a> MockGame<'a> {
+        fn new(context: GameContext<'a>) -> Self {
+            Self {
+                context,
+                called: false,
+                obj: String::new(),
+                loc: String::new(),
+            }
+        }
+
+        pub fn invoke<'me>(&'me mut self, action: Action) -> Handled
+        where
+            'me: 'a,
+        {
+            match action.clone() {
+                Action::Examine(Some(o)) => {
+                    if let Some(object) = self.context.locals().get(&o) {
+                        // return object.act_react(self, action);
+                    }
+                    false
+                }
+                _ => false,
+            }
+        }
+    }
+
+    impl<'a> Mediator<'a> for MockGame<'a> {
+        fn notify(&'a mut self, action: NotifyAction) -> Handled {
+            self.called = true;
+            match action {
+                NotifyAction::Set(location) => match location {
+                    Location::To(name) => {
+                        self.loc = name;
+                        return true;
+                    }
+                    _ => return false,
+                },
+                NotifyAction::Move(object_name, location) => match location {
+                    Location::Inventory => {
+                        self.obj = object_name;
+                        self.loc = "inventory".to_string();
+                        return true;
+                    }
+                    Location::Local => {
+                        self.obj = object_name;
+                        self.loc = "here".to_string();
+                        return true;
+                    }
+                    Location::To(name) => {
+                        self.obj = object_name;
+                        self.loc = name;
+                        return true;
+                    }
+                },
+            }
+        }
+    }
+
+    fn setup_kitchen() -> GameContext<'static> {
+        let mut vec = Vec::new() as Vec<Box<dyn GameObject>>;
+        kitchen::create(&mut vec);
+
+        let mut context = GameContext::new(vec[0].name());
+        context.set_locals(Box::new(vec));
+        context
+    }
 
     #[test]
     fn test_parser() {
@@ -256,27 +331,25 @@ mod tests {
 
     #[test]
     fn test_parser_look() {
-        let mut vec = Vec::new() as Vec<Box<dyn GameObject>>;
-        kitchen::create(&mut vec);
-
-        let mut context = GameContext::new(vec[0].name());
-        context.set_locals(&vec);
-
-        let sink = Some(vec[1].name());
-
+        let context = setup_kitchen();
         let parser = Parser::default();
-        let token = Token::new("look".to_string(), sink.clone(), None);
+        let sink = Some(String::from("sink"));
+        let token = Token::new(String::from("look"), sink.clone(), None);
         let action = parser.to_action(token, &context);
         assert_eq!(action, Action::Examine(sink));
     }
 
-    // #[test]
-    // fn test_parser_go_north() {
-    //     let parser = Parser::new();
-    //     let context = GameContext::new();
-    //     let action = parser.input_action(&context);
-    //     assert_eq!(action, Action::Help);
-    // }
+    #[test]
+    fn test_parser_move() {
+        let context = setup_kitchen();
+        let parser = Parser::default();
+        let sink = Some(String::from("sink"));
+        let token = Token::new(String::from("x"), sink.clone(), None);
+        let action = parser.to_action(token, &context);
+        let mut game = MockGame::default();
+        let handled = game.invoke(action);
+        assert_eq!(handled, true);
+    }
 
     // #[test]
     // fn test_parser_go_north_to() {

@@ -83,7 +83,14 @@ impl GameObject for Sink {
         self.loc.clone()
     }
 
-    fn act(&mut self, action: Action) -> Handled {
+    fn act_react<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
         match action {
             Action::Describe(_) => {
                 println!("A sink full of dirty dishes.");
@@ -91,6 +98,7 @@ impl GameObject for Sink {
             }
             Action::Examine(_) => {
                 println!("The dishes are covered in mold. You can't tell what they were originally. Wait... is that a knife?");
+                mediator.notify(NotifyAction::Move("knife".to_string(), Location::Local));
                 true
             }
             _ => false,

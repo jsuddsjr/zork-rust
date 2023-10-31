@@ -56,11 +56,27 @@ impl GameAtlas {
             })
             .collect()
     }
+
+    pub fn invoke<'me, 'a>(
+        &'me mut self,
+        mediator: &'a mut dyn Mediator<'a>,
+        object_name: String,
+        action: Action,
+    ) -> Handled
+    where
+        'me: 'a,
+    {
+        if let Some(o) = self.atlas.get_mut(&object_name) {
+            return o.act(action.clone()) || o.act_react(mediator, action);
+        }
+        false
+    }
 }
 
 #[derive(Default)]
 pub struct GameContext<'a> {
     here: String,                                     // current location
+    vec: Option<&'a Vec<Box<dyn GameObject>>>,        // objects in current location
     locals: HashMap<String, &'a Box<dyn GameObject>>, // objects in current location
     inv: HashMap<String, &'a Box<dyn GameObject>>,    // objects carried to next location
 }
@@ -69,6 +85,7 @@ impl<'a> GameContext<'a> {
     pub fn new(here: String) -> Self {
         Self {
             here,
+            vec: None,
             locals: HashMap::new(),
             inv: HashMap::new(),
         }
@@ -83,9 +100,10 @@ impl<'a> GameContext<'a> {
     }
 
     #[allow(dead_code)]
-    pub fn set_locals(&mut self, locals: &'a Vec<Box<dyn GameObject>>) {
+    pub fn set_locals(&mut self, locals: Box<Vec<Box<dyn GameObject>>>) {
+        self.vec = Some(Box::leak(locals));
         self.locals.clear();
-        locals.into_iter().for_each(|o| {
+        self.vec.unwrap().into_iter().for_each(|o| {
             self.locals.insert(o.name(), &o);
         });
     }
@@ -106,6 +124,10 @@ impl<'a> GameContext<'a> {
             println!("** {} removed from {}", o.name(), o.loc());
         }
         self.inv.insert(object.name(), object);
+    }
+
+    pub fn _remove_inv(&mut self, object_name: String) {
+        self.inv.remove(&object_name);
     }
 }
 

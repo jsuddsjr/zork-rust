@@ -10,7 +10,7 @@ pub use parser::Token;
 
 pub type Handled = bool;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 
 pub enum Direction {
     North,
@@ -23,7 +23,7 @@ pub enum Direction {
     Enter,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 // Actions are created by the parser.
 pub enum Action {
