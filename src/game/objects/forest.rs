@@ -57,7 +57,7 @@ impl GameObject for Leaves {
         Forest::default().name()
     }
 
-    fn act(&mut self, action: Action) -> Handled {
+    fn act(&self, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("You see a pile of leaves.");

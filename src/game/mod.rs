@@ -100,7 +100,7 @@ pub trait GameObject {
         false
     }
 
-    fn act(&mut self, action: Action) -> Handled {
+    fn act(&self, action: Action) -> Handled {
         false
     }
 

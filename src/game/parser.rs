@@ -1,6 +1,6 @@
 use super::game::GameContext;
 use super::{Action, Direction, GameObject};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::io::{stdin, stdout, Write};
 
 static SKIP_WORDS: [&str; 9] = ["a", "an", "at", "here", "of", "out", "the", "to", "with"];
@@ -122,16 +122,12 @@ impl Parser {
         Token::from_action("help")
     }
 
-    fn get_targets(
-        &self,
-        action: &Action,
-        map: &HashMap<String, &Box<dyn GameObject>>,
-    ) -> Vec<String> {
+    fn get_targets(&self, action: &Action, map: &Vec<&Box<dyn GameObject>>) -> Vec<String> {
         let mut matches: Vec<String> = Vec::new();
         // get all objects that can do action
-        for (key, obj) in map.iter() {
+        for obj in map.iter() {
             if obj.can_do(action) {
-                matches.push(key.clone());
+                matches.push(obj.name());
             }
         }
         matches
@@ -241,7 +237,9 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::{objects::kitchen, Handled, Location, Mediator, NotifyAction};
+    use crate::game::{
+        objects::kitchen, GameAtlas, GameContext, Handled, Location, Mediator, NotifyAction,
+    };
 
     use super::*;
 
@@ -269,8 +267,8 @@ mod tests {
         {
             match action.clone() {
                 Action::Examine(Some(o)) => {
-                    if let Some(object) = self.context.locals().get(&o) {
-                        // return object.act_react(self, action);
+                    if let Some(object) = self.context.locals().iter().find(|&x| x.name() == o) {
+                        return object.act(action);
                     }
                     false
                 }
@@ -311,19 +309,20 @@ mod tests {
         }
     }
 
-    fn setup_kitchen() -> GameContext<'static> {
+    fn setup_kitchen() -> GameAtlas {
         let mut vec = Vec::new() as Vec<Box<dyn GameObject>>;
         kitchen::create(&mut vec);
 
-        let mut context = GameContext::new(vec[0].name());
-        context.set_locals(Box::new(vec));
-        context
+        let mut atlas = GameAtlas::new(vec[0].name());
+        atlas.add_all(vec);
+        atlas
     }
 
     #[test]
     fn test_parser() {
         let parser = Parser::default();
-        let context = GameContext::new(String::new());
+        let atlas = setup_kitchen();
+        let context = atlas.get_context();
         let token: Token = Token::from_action("?");
         let action = parser.to_action(token, &context);
         assert_eq!(action, Action::Help);
@@ -331,21 +330,21 @@ mod tests {
 
     #[test]
     fn test_parser_look() {
-        let context = setup_kitchen();
+        let atlas = setup_kitchen();
         let parser = Parser::default();
         let sink = Some(String::from("sink"));
         let token = Token::new(String::from("look"), sink.clone(), None);
-        let action = parser.to_action(token, &context);
+        let action = parser.to_action(token, &atlas.get_context());
         assert_eq!(action, Action::Examine(sink));
     }
 
     #[test]
     fn test_parser_move() {
-        let context = setup_kitchen();
+        let atlas = setup_kitchen();
         let parser = Parser::default();
         let sink = Some(String::from("sink"));
         let token = Token::new(String::from("x"), sink.clone(), None);
-        let action = parser.to_action(token, &context);
+        let action = parser.to_action(token, &atlas.get_context());
         let mut game = MockGame::default();
         let handled = game.invoke(action);
         assert_eq!(handled, true);

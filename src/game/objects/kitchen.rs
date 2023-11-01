@@ -282,7 +282,7 @@ impl GameObject for Bread {
         }
     }
 
-    fn act(&mut self, action: Action) -> Handled {
+    fn act(&self, action: Action) -> Handled {
         match action {
             Action::Describe(_) => {
                 println!("It's a loaf of bread, very stale.");
