@@ -122,8 +122,8 @@ impl GameAtlas {
     pub fn move_local(&mut self, object_name: String) -> bool {
         if let Some(rc) = self.atlas.get(&object_name) {
             let mut o = rc.borrow_mut();
-            println!("** {} appears here {}", o.name(), o.loc());
-            o.set_loc(INV.to_string());
+            println!("** {} appears here {}", o.name(), self.here());
+            o.set_loc(self.here());
             return true;
         }
         false
@@ -295,9 +295,14 @@ impl Game {
         // }
 
         let parser = Parser::default();
+        let mut last_here = String::new();
 
         loop {
-            self.print_location();
+            let here = self.atlas.here();
+            if here != last_here {
+                last_here = here.clone();
+                self.print_location();
+            }
 
             let action = {
                 let context = self.atlas.get_context();

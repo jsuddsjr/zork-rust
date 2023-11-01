@@ -79,15 +79,15 @@ impl GameObject for Leaves {
         match action {
             Action::Describe(_) => {
                 println!("There's a pile of leaves here.");
-                Notify::Handled
+                Notify::Unhandled
             }
             Action::Attack(_, _) => {
-                println!("The leaves flutter and fly as you kick through them.");
                 if self.contains_key {
                     println!("You uncover a key hidden in the leaves.");
                     self.contains_key = false;
                     Notify::Move("key".to_string(), Location::Local)
                 } else {
+                    println!("The leaves flutter and fly as you kick through them.");
                     Notify::Handled
                 }
             }
@@ -134,7 +134,7 @@ impl GameObject for Key {
         match action {
             Action::Describe(_) => {
                 println!("A shiny key glints in the grass.");
-                Notify::Handled
+                Notify::Unhandled
             }
             Action::Take(_) => {
                 println!("You take the key.");
