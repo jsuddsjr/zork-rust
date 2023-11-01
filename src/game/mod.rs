@@ -76,14 +76,12 @@ pub enum Location {
     To(String),
 }
 
-pub enum NotifyAction {
-    Set(Location),          // game location
-    Move(String, Location), // object name, new location
-}
-
-// Mediator has notification methods.
-pub trait Mediator<'a> {
-    fn notify(&'a mut self, action: NotifyAction) -> Handled;
+pub enum Notify {
+    Handled,                 // handled, don't do anything else
+    Unhandled,               // not handled, try other objects
+    Set(Location),           // update game location
+    Move(String, Location),  // object name, new location
+    Replace(String, String), // old object name, new object name, same location
 }
 
 #[allow(unused_variables)]
@@ -100,18 +98,7 @@ pub trait GameObject {
         false
     }
 
-    fn act(&self, action: Action) -> Handled {
-        false
-    }
-
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
-        false
+    fn act(&mut self, action: Action) -> Notify {
+        Notify::Unhandled
     }
 }

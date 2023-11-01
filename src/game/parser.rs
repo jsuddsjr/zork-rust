@@ -1,6 +1,8 @@
 use super::game::GameContext;
 use super::{Action, Direction, GameObject};
+use std::cell::Ref;
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::io::{stdin, stdout, Write};
 
 static SKIP_WORDS: [&str; 9] = ["a", "an", "at", "here", "of", "out", "the", "to", "with"];
@@ -122,7 +124,7 @@ impl Parser {
         Token::from_action("help")
     }
 
-    fn get_targets(&self, action: &Action, map: &Vec<&Box<dyn GameObject>>) -> Vec<String> {
+    fn get_targets(&self, action: &Action, map: &Vec<Ref<'_, Box<dyn GameObject>>>) -> Vec<String> {
         let mut matches: Vec<String> = Vec::new();
         // get all objects that can do action
         for obj in map.iter() {
@@ -186,7 +188,7 @@ impl Parser {
         };
     }
 
-    fn to_direction(&self, direction: &String) -> Option<Direction> {
+    fn to_direction(&self, direction: String) -> Option<Direction> {
         let dir = direction.as_str();
         match dir {
             "north" | "n" | "forward" | "f" => return Some(Direction::North),
@@ -211,7 +213,7 @@ impl Parser {
             | "skip" | "walk" => {
                 if token.prsi.is_some() {
                     let prsi = token.prsi.unwrap();
-                    if let Some(direction) = self.to_direction(&prsi) {
+                    if let Some(direction) = self.to_direction(prsi.clone()) {
                         return Action::Go(direction);
                     } else {
                         return Action::UnknownDirection(prsi);
@@ -237,75 +239,68 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::{
-        objects::kitchen, GameAtlas, GameContext, Handled, Location, Mediator, NotifyAction,
-    };
+    use crate::game::{objects::kitchen, GameAtlas, Handled, Location, Notify};
 
     use super::*;
 
     #[derive(Default)]
-    struct MockGame<'a> {
-        context: GameContext<'a>,
-        called: bool,
+    struct MockGame {
+        atlas: GameAtlas,
         obj: String,
         loc: String,
     }
 
-    impl<'a> MockGame<'a> {
-        fn new(context: GameContext<'a>) -> Self {
+    impl MockGame {
+        #[allow(dead_code)]
+        fn new(atlas: GameAtlas) -> Self {
             Self {
-                context,
-                called: false,
+                atlas,
                 obj: String::new(),
                 loc: String::new(),
             }
         }
 
-        pub fn invoke<'me>(&'me mut self, action: Action) -> Handled
-        where
-            'me: 'a,
-        {
-            match action.clone() {
-                Action::Examine(Some(o)) => {
-                    if let Some(object) = self.context.locals().iter().find(|&x| x.name() == o) {
-                        return object.act(action);
-                    }
-                    false
-                }
-                _ => false,
-            }
-        }
-    }
+        pub fn invoke(&mut self, action: Action) -> Handled {
+            let mut handled = false;
+            if let Some(mut obj) = self.atlas.get_mut(self.obj.clone()) {
+                let notification = obj.act(action.clone());
+                match notification {
+                    Notify::Handled => handled = true,
+                    Notify::Unhandled => handled = false,
 
-    impl<'a> Mediator<'a> for MockGame<'a> {
-        fn notify(&'a mut self, action: NotifyAction) -> Handled {
-            self.called = true;
-            match action {
-                NotifyAction::Set(location) => match location {
-                    Location::To(name) => {
-                        self.loc = name;
-                        return true;
-                    }
-                    _ => return false,
-                },
-                NotifyAction::Move(object_name, location) => match location {
-                    Location::Inventory => {
+                    Notify::Set(location) => match location {
+                        Location::To(name) => {
+                            self.loc = name;
+                            handled = true;
+                        }
+                        _ => handled = false,
+                    },
+
+                    Notify::Move(object_name, location) => match location {
+                        Location::Inventory => {
+                            self.obj = object_name;
+                            self.loc = "inventory".to_string();
+                            handled = true;
+                        }
+                        Location::Local => {
+                            self.obj = object_name;
+                            self.loc = "here".to_string();
+                            handled = true;
+                        }
+                        Location::To(name) => {
+                            self.obj = object_name;
+                            self.loc = name;
+                            handled = true;
+                        }
+                    },
+
+                    Notify::Replace(_, object_name) => {
                         self.obj = object_name;
-                        self.loc = "inventory".to_string();
-                        return true;
+                        handled = true;
                     }
-                    Location::Local => {
-                        self.obj = object_name;
-                        self.loc = "here".to_string();
-                        return true;
-                    }
-                    Location::To(name) => {
-                        self.obj = object_name;
-                        self.loc = name;
-                        return true;
-                    }
-                },
+                }
             }
+            handled
         }
     }
 

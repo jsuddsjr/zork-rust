@@ -1,5 +1,4 @@
-use crate::game::{Action, GameObject, Handled, Location, Mediator, NotifyAction};
-use std::collections::HashMap;
+use crate::game::{Action, Direction, GameObject, Location, Notify};
 
 pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(Kitchen::new()));
@@ -7,23 +6,20 @@ pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(Knife::new()));
     vec.push(Box::new(BreadBox::new()));
     vec.push(Box::new(Bread::new()));
+    vec.push(Box::new(GoldRing::new()));
 }
 
 #[derive(Default)]
 pub struct Kitchen {
     name: String,
+    seen: bool,
 }
 
 impl Kitchen {
     pub fn new() -> Self {
-        let mut objects: HashMap<String, Box<dyn GameObject>> = HashMap::new();
-        objects.insert(Sink::new().name(), Box::new(Sink::new()));
-        objects.insert(Knife::new().name(), Box::new(Knife::new()));
-        objects.insert(BreadBox::new().name(), Box::new(BreadBox::new()));
-        objects.insert(Bread::new().name(), Box::new(Bread::new()));
-
         Self {
             name: "kitchen".to_string(),
+            seen: false,
         }
     }
 }
@@ -33,29 +29,31 @@ impl GameObject for Kitchen {
         self.name.clone()
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
-        match action {
+    fn act(&mut self, action: Action) -> Notify {
+        return match action {
             Action::Arrive(_) => {
-                println!("Eww... What's that smell?");
-                true
+                if !self.seen {
+                    println!("You are in a kitchen. The dishes are piled in the sink. The refrigerator is empty. There is a breadbox on the counter.");
+                    self.seen = true;
+                } else {
+                    println!("You are in a kitchen. The dishes are still piled in the sink. The refrigerator is still empty. The breadbox is still on the counter.");
+                }
+                Notify::Handled
             }
-            Action::Leave(_) => {
-                mediator.notify(NotifyAction::Set(Location::To("forest".to_string())));
-                true
+            Action::Listen(_) => {
+                println!("You hear the faint buzzing of flies and a slow drip into the sink.");
+                Notify::Handled
             }
             Action::Describe(_) => {
-                println!("You are in a kitchen. By the looks of it, no one has been here for a very long time. Dishes piled in the sink have a thick layer of mold. The refrigerator is empty. The only thing that looks edible is a loaf of bread in a breadbox on the counter.");
-                true
+                println!("You are in a kitchen. It's a mess.");
+                Notify::Handled
             }
-            _ => false,
-        }
+            Action::Leave(_) | Action::Go(Direction::Exit) => {
+                println!("You head toward fresher air.");
+                Notify::Set(Location::To("forest".to_string()))
+            }
+            _ => Notify::Unhandled,
+        };
     }
 }
 
@@ -63,6 +61,7 @@ impl GameObject for Kitchen {
 pub struct Sink {
     name: String,
     loc: String,
+    holds_knife: bool,
 }
 
 impl Sink {
@@ -70,6 +69,7 @@ impl Sink {
         Self {
             name: "sink".to_string(),
             loc: Kitchen::default().name(),
+            holds_knife: true,
         }
     }
 }
@@ -83,26 +83,23 @@ impl GameObject for Sink {
         self.loc.clone()
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
-        match action {
+    fn act(&mut self, action: Action) -> Notify {
+        return match action {
             Action::Describe(_) => {
                 println!("A sink full of dirty dishes.");
-                true
+                Notify::Handled
             }
             Action::Examine(_) => {
-                println!("The dishes are covered in mold. You can't tell what they were originally. Wait... is that a knife?");
-                mediator.notify(NotifyAction::Move("knife".to_string(), Location::Local));
-                true
+                if self.holds_knife {
+                    println!("The dishes are covered in mold and a milky slime. Wait... is that a knife?");
+                    Notify::Move("knife".to_string(), Location::Local)
+                } else {
+                    println!("The dishes are covered in mold and a milky slime. Gross.");
+                    Notify::Handled
+                }
             }
-            _ => false,
-        }
+            _ => Notify::Unhandled,
+        };
     }
 }
 
@@ -143,40 +140,32 @@ impl GameObject for Knife {
         }
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
+    fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Describe(_) => {
                 println!("A rusty knife.");
-                true
+                Notify::Handled
             }
             Action::Examine(_) => {
                 println!("It won't slay a dragon, but it might work on bread.");
-                true
+                Notify::Handled
             }
             Action::Take(_) => {
                 println!(
                     "You reach in gingerly and take the knife, barely resisting the urge to vomit."
                 );
-                mediator.notify(NotifyAction::Move(self.name(), Location::Inventory));
-                true
+                Notify::Move(self.name(), Location::Inventory)
             }
             Action::Use(target, _) | Action::Attack(target, _) => {
                 if target == Bread::default().name() {
                     println!("You hack the crusty loaf clean in two. Take that you vile loaf!!");
-                    true
+                    Notify::Move(GoldRing::default().name(), Location::Local)
                 } else {
                     println!("Are you serious? You can't use a knife on that.");
-                    false
+                    Notify::Handled
                 }
             }
-            _ => false,
+            _ => Notify::Unhandled,
         }
     }
 }
@@ -185,7 +174,7 @@ impl GameObject for Knife {
 pub struct BreadBox {
     name: String,
     loc: String,
-    contains_bread: bool,
+    unlocked: bool,
 }
 
 impl BreadBox {
@@ -193,7 +182,7 @@ impl BreadBox {
         Self {
             name: "breadbox".to_string(),
             loc: Kitchen::default().name(),
-            contains_bread: true,
+            unlocked: false,
         }
     }
 }
@@ -207,38 +196,46 @@ impl GameObject for BreadBox {
         self.loc.clone()
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
+    fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Describe(_) => {
-                if self.contains_bread {
-                    println!("A breadbox with a loaf of bread in it.");
-                } else {
+                if self.unlocked {
                     println!("An empty breadbox.");
-                }
-                true
-            }
-            Action::Open(_, _) => {
-                if self.contains_bread {
-                    println!("You open the breadbox and take the loaf of bread.");
-                    mediator.notify(NotifyAction::Move("bread".to_string(), Location::Inventory));
-                    self.contains_bread = false;
                 } else {
-                    println!("It's empty.");
+                    println!("A breadbox.");
                 }
-                true
+                Notify::Handled
             }
+            Action::Open(_, with) => match with {
+                None => {
+                    if self.unlocked {
+                        println!("It's empty.");
+                        return Notify::Handled;
+                    } else {
+                        println!("You try to open the breadbox, but it's locked.\nWhat kind of person locks a breadbox?");
+                        return Notify::Handled;
+                    }
+                }
+                Some(item) => {
+                    if item.as_str() != "key" {
+                        println!("You can't open the breadbox with that.");
+                        return Notify::Handled;
+                    } else {
+                        println!("You open the breadbox and take the loaf of bread.");
+                        Notify::Replace("key".to_string(), "bread".to_string())
+                    }
+                }
+            },
             Action::Examine(_) => {
+                if self.unlocked {
+                    println!("It's an empty breadbox.");
+                } else {
+                    println!("You give the breadbox a shake and something heavy and hard rattles inside.\nUnfortunately, you can't see what it is because the breadbox is locked.");
+                }
                 println!("It's a breadbox.");
-                true
+                Notify::Handled
             }
-            _ => false,
+            _ => Notify::Unhandled,
         }
     }
 
@@ -282,15 +279,19 @@ impl GameObject for Bread {
         }
     }
 
-    fn act(&self, action: Action) -> Handled {
+    fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Describe(_) => {
-                println!("It's a loaf of bread, very stale.");
-                true
+                println!("A crusty loaf of bread.");
+                Notify::Handled
             }
             Action::Examine(_) => {
                 println!("The crust is so dry and hard that you'd break a tooth trying to eat it.");
-                true
+                Notify::Handled
+            }
+            Action::Take(_) => {
+                println!("You take the bread.");
+                Notify::Move(self.name(), Location::Inventory)
             }
             Action::Attack(_, attacker) => {
                 if attacker.is_none() {
@@ -298,9 +299,70 @@ impl GameObject for Bread {
                 } else {
                     println!("The loaf resists the {}.", attacker.unwrap());
                 }
-                false
+                Notify::Handled
             }
+            _ => Notify::Unhandled,
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+struct GoldRing {
+    name: String,
+    loc: String,
+    seen: bool,
+}
+
+impl GoldRing {
+    pub fn new() -> Self {
+        Self {
+            name: "gold ring".to_string(),
+            loc: Bread::default().name(),
+            seen: false,
+        }
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+impl GameObject for GoldRing {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn loc(&self) -> String {
+        self.loc.clone()
+    }
+
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Take(_) => true,
             _ => false,
+        }
+    }
+
+    fn act(&mut self, action: Action) -> Notify {
+        match action {
+            Action::Describe(_) => {
+                if !self.seen {
+                    println!("A gold ring, barely big enough for your pinky finger, falls onto the counter with clear tinkling sound.");
+                    self.seen = true;
+                } else {
+                    println!("A gold ring, barely big enough for your pinky finger.");
+                }
+                Notify::Handled
+            }
+            Action::Examine(_) => {
+                println!("It's a pretty, albeit small, gold ring.");
+                Notify::Handled
+            }
+            Action::Take(_) => {
+                println!("You slip the ring into your pocket.");
+                Notify::Move(self.name(), Location::Inventory)
+            }
+            _ => Notify::Unhandled,
         }
     }
 }

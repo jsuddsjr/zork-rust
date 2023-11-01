@@ -1,19 +1,20 @@
 use super::parser::Parser;
-use super::{Action, GameObject, Handled, Location, Mediator, NotifyAction};
+use super::{Action, GameObject, Handled, Location, Notify};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 
 // TODO: do I need a context for the action?
 // Can I take an object from the cupboard, if I'm not standing in the kicthen?
 // Is the book in the bookshelf, or in the library itself?
 
-static INV: &str = "__inv";
-static NOWHERE: &str = "__nowhere";
-static GLOBAL: &str = "__global";
+pub static INV: &str = "__inv";
+pub static NOWHERE: &str = "__nowhere";
+pub static _GLOBAL: &str = "__global";
 
 #[derive(Default)]
 pub struct GameAtlas {
     here: String,
-    atlas: HashMap<String, Box<dyn GameObject>>,
+    atlas: HashMap<String, RefCell<Box<dyn GameObject>>>,
 }
 
 impl GameAtlas {
@@ -43,27 +44,35 @@ impl GameAtlas {
             println!("cannot add duplicate object: '{}'", object.name());
             return;
         }
-        self.atlas.insert(object.name(), object);
+        self.atlas.insert(object.name(), RefCell::new(object));
     }
 
-    pub fn get(&self, name: &String) -> Option<&'_ Box<dyn GameObject>> {
-        self.atlas.get(name)
+    #[allow(dead_code)]
+    pub fn get(&self, name: String) -> Option<Ref<'_, Box<dyn GameObject>>> {
+        self.atlas.get(&name).map_or(None, |o| Some(o.borrow()))
     }
 
-    pub fn set_loc(&mut self, name: &String, location: String) -> bool {
-        if let Some(o) = self.atlas.get_mut(name) {
-            o.set_loc(location);
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self, name: String) -> Option<RefMut<'_, Box<dyn GameObject>>> {
+        self.atlas
+            .get_mut(&name)
+            .map_or(None, |o| Some(o.borrow_mut()))
+    }
+
+    pub fn set_loc(&mut self, name: String, location: String) -> bool {
+        if let Some(o) = self.atlas.get(&name) {
+            o.borrow_mut().set_loc(location);
             return true;
         }
         false
     }
 
-    pub fn get_locals(&self, here: String) -> Vec<&'_ Box<dyn GameObject>> {
+    pub fn get_locals(&self, here: String) -> Vec<Ref<'_, Box<dyn GameObject>>> {
         self.atlas
             .iter()
             .filter_map(|(k, v)| {
-                if v.loc() == here || *k == here {
-                    Some(v)
+                if v.borrow().loc() == here || *k == here {
+                    Some(v.borrow())
                 } else {
                     None
                 }
@@ -71,12 +80,16 @@ impl GameAtlas {
             .collect()
     }
 
-    pub fn get_inventory(&self) -> Vec<&'_ Box<dyn GameObject>> {
+    pub fn get_locals_here(&self) -> Vec<Ref<'_, Box<dyn GameObject>>> {
+        self.get_locals(self.here())
+    }
+
+    pub fn get_inventory(&self) -> Vec<Ref<'_, Box<dyn GameObject>>> {
         self.atlas
             .iter()
             .filter_map(|(_k, v)| {
-                if v.loc().as_str() == INV {
-                    Some(v)
+                if v.borrow().loc().as_str() == INV {
+                    Some(v.borrow())
                 } else {
                     None
                 }
@@ -85,14 +98,10 @@ impl GameAtlas {
     }
 
     pub fn get_context(&self) -> GameContext {
-        GameContext::new(
-            self.here(),
-            self.get_locals(self.here()),
-            self.get_inventory(),
-        )
+        GameContext::new(self.here(), self.get_locals_here(), self.get_inventory())
     }
 
-    pub fn get_context_for(&self, here: String) -> GameContext {
+    pub fn _get_context_for(&self, here: String) -> GameContext {
         GameContext::new(
             here.clone(),
             self.get_locals(here.clone()),
@@ -101,7 +110,8 @@ impl GameAtlas {
     }
 
     pub fn move_inventory(&mut self, object_name: String) -> bool {
-        if let Some(o) = self.atlas.get_mut(&object_name) {
+        if let Some(rc) = self.atlas.get(&object_name) {
+            let mut o = rc.borrow_mut();
             println!("** {} moves from {} to inventory", o.name(), o.loc());
             o.set_loc(INV.to_string());
             return true;
@@ -110,8 +120,9 @@ impl GameAtlas {
     }
 
     pub fn move_local(&mut self, object_name: String) -> bool {
-        if let Some(o) = self.atlas.get_mut(&object_name) {
-            println!("** {} moves from {} to inventory", o.name(), o.loc());
+        if let Some(rc) = self.atlas.get(&object_name) {
+            let mut o = rc.borrow_mut();
+            println!("** {} appears here {}", o.name(), o.loc());
             o.set_loc(INV.to_string());
             return true;
         }
@@ -119,7 +130,8 @@ impl GameAtlas {
     }
 
     pub fn _remove_object(&mut self, object_name: String) -> bool {
-        if let Some(o) = self.atlas.get_mut(&object_name) {
+        if let Some(rc) = self.atlas.get(&object_name) {
+            let mut o = rc.borrow_mut();
             println!("** {} from {} consumed", o.name(), o.loc());
             o.set_loc(NOWHERE.to_string());
             return true;
@@ -127,61 +139,82 @@ impl GameAtlas {
         false
     }
 
-    pub fn invoke<'me, 'a>(
-        &'me mut self,
-        object_names: Vec<Option<String>>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
+    pub fn replace_object(&mut self, old_name: String, new_name: String) -> bool {
+        if let Some(rc1) = self.atlas.get(&old_name) {
+            if let Some(rc2) = self.atlas.get(&new_name) {
+                let mut o1 = rc1.borrow_mut();
+                let mut o2 = rc2.borrow_mut();
+                println!("** {} replaced by {}", o1.name(), o2.name());
+                o2.set_loc(o1.loc());
+                o1.set_loc(NOWHERE.to_string());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn invoke_all(&mut self, action: Action, object_names: Vec<Option<String>>) -> Handled {
         for name in object_names {
             if name.is_some() {
-                if let Some(o) = self.atlas.get_mut(&name.unwrap()) {
-                    if o.act(action.clone()) || o.act_react(self, action.clone()) {
-                        return true;
-                    }
+                let handled = self.invoke(action.clone(), name.unwrap());
+                if handled {
+                    return true;
                 }
             }
         }
         false
     }
-}
 
-impl<'a> Mediator<'a> for GameAtlas {
-    fn notify(&'a mut self, action: NotifyAction) -> Handled {
-        match action {
-            NotifyAction::Set(location) => match location {
-                Location::To(name) => {
-                    self.here = name;
-                    return true;
-                }
-                _ => {
-                    return false;
-                }
-            },
+    pub fn invoke_here(&mut self, action: Action) -> Handled {
+        self.invoke(action, self.here())
+    }
 
-            NotifyAction::Move(object_name, location) => match location {
-                Location::Local => self.move_local(object_name),
-                Location::Inventory => self.move_inventory(object_name),
-                Location::To(name) => self.set_loc(&object_name, name),
-            },
+    pub fn invoke(&mut self, action: Action, object_name: String) -> Handled {
+        if let Some(rc) = self.atlas.get(&object_name) {
+            let notification: Notify = {
+                let mut o = rc.borrow_mut();
+                o.act(action)
+            };
+            match notification {
+                Notify::Handled => true,
+                Notify::Unhandled => false,
+
+                Notify::Set(location) => match location {
+                    Location::To(name) => {
+                        self.set_here(name);
+                        true
+                    }
+                    _ => false,
+                },
+
+                Notify::Move(object_name, location) => match location {
+                    Location::Local => self.move_local(object_name),
+                    Location::Inventory => self.move_inventory(object_name),
+                    Location::To(name) => self.set_loc(object_name, name),
+                },
+
+                Notify::Replace(old_obj, new_obj) => self.replace_object(old_obj, new_obj),
+            }
+        } else {
+            false
         }
     }
 }
 
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct GameContext<'a> {
-    here: String,                         // current location
-    locals: Vec<&'a Box<dyn GameObject>>, // objects in current location
-    inv: Vec<&'a Box<dyn GameObject>>,    // objects carried to next location
+    here: String,                              // current location
+    locals: Vec<Ref<'a, Box<dyn GameObject>>>, // objects in current location
+    inv: Vec<Ref<'a, Box<dyn GameObject>>>,    // objects carried to next location
 }
 
+#[allow(dead_code)]
 impl<'a> GameContext<'a> {
     pub fn new(
         here: String,
-        locals: Vec<&'a Box<dyn GameObject>>,
-        inv: Vec<&'a Box<dyn GameObject>>,
+        locals: Vec<Ref<'a, Box<dyn GameObject>>>,
+        inv: Vec<Ref<'a, Box<dyn GameObject>>>,
     ) -> Self {
         Self { here, locals, inv }
     }
@@ -190,11 +223,11 @@ impl<'a> GameContext<'a> {
         self.here.clone()
     }
 
-    pub fn locals(&self) -> &Vec<&'a Box<dyn GameObject>> {
+    pub fn locals(&self) -> &Vec<Ref<'a, Box<dyn GameObject>>> {
         &self.locals
     }
 
-    pub fn inv(&self) -> &Vec<&'a Box<dyn GameObject>> {
+    pub fn inv(&self) -> &Vec<Ref<'a, Box<dyn GameObject>>> {
         &self.inv
     }
 }
@@ -218,31 +251,29 @@ impl Game {
         true
     }
 
-    pub fn print_location(&self) -> Handled {
-        let context = self.atlas.get_context();
-        println!("You are in {}", context.here());
-        true
+    fn to_names(&self, objects: &Vec<Ref<'_, Box<dyn GameObject>>>) -> Vec<Option<String>> {
+        objects.iter().map(|o| Some(o.name())).collect()
     }
 
-    pub fn print_explore(&self) -> Handled {
-        let locals = self.atlas.get_locals(self.atlas.here());
-        if locals.len() > 0 {
-            println!("You see:");
-            for o in locals {
-                // TODO: Describe does not require callback.
-                o.act(Action::Describe(Some(o.name())));
-            }
-        } else {
+    pub fn print_location(&mut self) -> Handled {
+        print!("\n{}\n", self.atlas.here().to_uppercase());
+        let locals = self.to_names(&self.atlas.get_locals_here());
+        if locals.is_empty() {
             println!("You see nothing of interest.");
+        } else {
+            self.atlas.invoke_all(Action::Describe(None), locals);
         }
         true
     }
 
-    pub fn print_inventory(&self) -> Handled {
-        let inventory = self.atlas.get_inventory();
-        println!("You are carrying:");
-        for o in inventory {
-            o.act(Action::Describe(Some(o.name())));
+    pub fn print_inventory(&mut self) -> Handled {
+        let inventory = self.to_names(&self.atlas.get_inventory());
+        if inventory.is_empty() {
+            println!("You are not carrying anything.");
+            return true;
+        } else {
+            println!("You are carrying:");
+            self.atlas.invoke_all(Action::Describe(None), inventory);
         }
         true
     }
@@ -254,7 +285,7 @@ impl Game {
         prsi: Option<String>,
     ) -> Handled {
         let objects = vec![prsi, prso, Some(self.atlas.here())];
-        self.atlas.invoke(objects, action)
+        self.atlas.invoke_all(action, objects)
     }
 
     pub fn run(&mut self) {
@@ -266,13 +297,19 @@ impl Game {
         let parser = Parser::default();
 
         loop {
-            let context = self.atlas.get_context();
-            let action = parser.input_action(&context);
+            self.print_location();
+
+            let action = {
+                let context = self.atlas.get_context();
+                parser.input_action(&context)
+            };
+
             let handled: Handled = match action.clone() {
                 Action::Die => self.print_death(),
                 Action::Help => self.print_help(),
+                Action::Inventory => self.print_inventory(),
                 Action::Quit => break,
-                Action::Go(_) => self.atlas.invoke(vec![], action),
+                Action::Go(_) | Action::Wait => self.atlas.invoke_here(action),
                 Action::Climb(prso)
                 | Action::Describe(prso)
                 | Action::Examine(prso)
@@ -291,7 +328,7 @@ impl Game {
                     false
                 }
                 Action::AmbiguousObject(objects) => {
-                    println!("Which {} do you mean?", objects.join(", "));
+                    println!("That action could apply to: {}.", objects.join(", "));
                     false
                 }
                 _ => false,

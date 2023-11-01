@@ -1,8 +1,8 @@
-use crate::game::{Action, Direction, GameObject, Handled, Location, Mediator, NotifyAction};
+use crate::game::{Action, Direction, GameObject, Location, Notify};
 
 pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(Forest::default()));
-    vec.push(Box::new(Leaves::default()));
+    vec.push(Box::new(Leaves::new()));
     vec.push(Box::new(Key::new()));
 }
 
@@ -14,39 +14,49 @@ impl GameObject for Forest {
         "forest".to_string()
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Go(Direction::North) => true,
+            Action::Describe(_) => true,
+            Action::Arrive(_) => true,
+            Action::Examine(_) => true,
+            _ => false,
+        }
+    }
+
+    fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Go(Direction::North) => {
                 println!("You follow the path north.");
-                mediator.notify(NotifyAction::Set(Location::To("kitchen".to_string())));
-                true
+                Notify::Set(Location::To("kitchen".to_string()))
             }
             Action::Describe(_) => {
                 println!("You find yourself standing in a forest clearing, surrounded by trees. There is a path to the north.");
-                true
+                Notify::Unhandled
             }
             Action::Arrive(_) => {
                 println!("The fog clears...");
-                true
+                Notify::Handled
             }
             Action::Examine(_) => {
-                println!("One of the trees nearby has been carved with the inscription: O+5.");
-                true
+                println!("One of the trees nearby has been carved with the inscription: C+J.");
+                Notify::Handled
             }
-            _ => false,
+            _ => Notify::Unhandled,
         }
     }
 }
 
 #[derive(Default)]
-pub struct Leaves;
+pub struct Leaves {
+    contains_key: bool,
+}
+
+impl Leaves {
+    pub fn new() -> Self {
+        Self { contains_key: true }
+    }
+}
 
 impl GameObject for Leaves {
     fn name(&self) -> String {
@@ -57,17 +67,31 @@ impl GameObject for Leaves {
         Forest::default().name()
     }
 
-    fn act(&self, action: Action) -> Handled {
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Describe(_) => true,
+            Action::Attack(_, _) => true,
+            _ => false,
+        }
+    }
+
+    fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Describe(_) => {
-                println!("You see a pile of leaves.");
-                true
+                println!("There's a pile of leaves here.");
+                Notify::Handled
             }
-            Action::Examine(_) => {
+            Action::Attack(_, _) => {
                 println!("The leaves flutter and fly as you kick through them.");
-                true
+                if self.contains_key {
+                    println!("You uncover a key hidden in the leaves.");
+                    self.contains_key = false;
+                    Notify::Move("key".to_string(), Location::Local)
+                } else {
+                    Notify::Handled
+                }
             }
-            _ => false,
+            _ => Notify::Unhandled,
         }
     }
 }
@@ -98,33 +122,25 @@ impl GameObject for Key {
         self.loc = loc;
     }
 
-    fn act_react<'me, 'a>(
-        &'me mut self,
-        mediator: &'a mut dyn Mediator<'a>,
-        action: Action,
-    ) -> Handled
-    where
-        'me: 'a,
-    {
+    fn can_do(&self, action: &Action) -> bool {
         match action {
-            Action::Describe(_) => {
-                println!("A shiny key glints in the grass.");
-                mediator.notify(NotifyAction::Move(self.name(), Location::Local));
-                true
-            }
-            Action::Take(_) => {
-                println!("You take the key.");
-                mediator.notify(NotifyAction::Move(self.name(), Location::Inventory));
-                true
-            }
+            Action::Describe(_) => true,
+            Action::Take(_) => true,
             _ => false,
         }
     }
 
-    fn can_do(&self, action: &Action) -> bool {
+    fn act(&mut self, action: Action) -> Notify {
         match action {
-            Action::Take(_) => true,
-            _ => false,
+            Action::Describe(_) => {
+                println!("A shiny key glints in the grass.");
+                Notify::Handled
+            }
+            Action::Take(_) => {
+                println!("You take the key.");
+                Notify::Move(self.name(), Location::Inventory)
+            }
+            _ => Notify::Unhandled,
         }
     }
 }
