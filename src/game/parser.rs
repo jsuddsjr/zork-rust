@@ -136,41 +136,45 @@ impl Parser {
     }
 
     fn to_indirect_action(&self, token: Token, context: &GameContext) -> Action {
-        if token.prso.is_none() {
-            return Action::MissingTarget(token.prsa.to_string());
-        }
+        match token.prso {
+            None => Action::UnknownAction(token.prsa.to_string()),
+            Some(prso) => {
+                // For brevity.
+                let (o, i) = (prso.clone(), token.prsi);
 
-        // For brevity.
-        let (o, i) = (token.prso.unwrap().clone(), token.prsi);
-
-        return match token.prsa.as_str() {
-            "attack" | "hit" | "kick" | "kill" | "throw" | "cut" | "slice" => Action::Attack(o, i),
-            "ignite" | "burn" | "light" | "switch" => Action::Light(o, i),
-            "drop" => Action::Drop(o, i),
-            "r" | "read" => Action::Read(o, i),
-            "unlock" | "open" => Action::Open(o, i),
-            "u" | "use" => {
-                // The symantic meaning of "use" is "use indirect on object".
-                // Examples: "Use key" or "Use key on door" or "use key with door"
-                // TODO: "use key to unlock door"
-                if i.is_some() {
-                    // If indirect object is specified, use it.
-                    Action::Use(i.unwrap(), Some(o))
-                } else {
-                    // Otherwise, find a target that can be used.
-                    let action = Action::Use("".to_string(), Some(o.clone()));
-                    let targets = self.get_targets(&action, context.locals());
-                    if targets.len() == 1 {
-                        Action::Use(targets[0].clone(), Some(o))
-                    } else if targets.len() > 1 {
-                        Action::AmbiguousObject(targets)
-                    } else {
-                        Action::MissingTarget(o)
+                match token.prsa.as_str() {
+                    "attack" | "hit" | "kick" | "kill" | "throw" | "cut" | "slice" => {
+                        Action::Attack(o, i)
                     }
+                    "ignite" | "burn" | "light" | "switch" => Action::Light(o, i),
+                    "drop" => Action::Drop(o, i),
+                    "r" | "read" => Action::Read(o, i),
+                    "unlock" | "open" => Action::Open(o, i),
+                    "u" | "use" => {
+                        // The symantic meaning of "use" is "use indirect on object".
+                        // Examples: "Use key" or "Use key on door" or "use key with door"
+                        // PRSA: use, PRSO: door, PRSI: key
+                        // TODO: "use key to unlock door"
+                        if i.is_some() {
+                            // If indirect object is specified, use it.
+                            Action::Use(i.unwrap(), Some(o))
+                        } else {
+                            // Otherwise, find a target that can be used.
+                            let action = Action::Use("".to_string(), Some(o.clone()));
+                            let targets = self.get_targets(&action, context.locals());
+                            if targets.len() == 1 {
+                                Action::Use(targets[0].clone(), Some(o))
+                            } else if targets.len() > 1 {
+                                Action::AmbiguousObject(targets)
+                            } else {
+                                Action::MissingTarget(o)
+                            }
+                        }
+                    }
+                    _ => Action::UnknownAction(token.prsa.to_string()),
                 }
             }
-            _ => Action::UnknownAction(token.prsa.to_string()),
-        };
+        }
     }
 
     fn to_direct_action(&self, token: Token, context: &GameContext) -> Action {
@@ -179,11 +183,11 @@ impl Parser {
 
         return match token.prsa.as_str() {
             "climb" => Action::Climb(o),
-            "desc" | "describe" => Action::Describe(o),
+            "desc" | "describe" | "look" => Action::Describe(o),
             "follow" | "stalk" => Action::Follow(o),
             "listen" | "play" => Action::Listen(o),
             "take" | "get" | "pick" => Action::Take(o),
-            "x" | "examine" | "explore" | "inspect" | "look" => Action::Examine(o),
+            "x" | "examine" | "explore" | "inspect" => Action::Examine(o),
             &_ => self.to_indirect_action(token, context),
         };
     }
@@ -191,49 +195,49 @@ impl Parser {
     fn to_direction(&self, direction: String) -> Option<Direction> {
         let dir = direction.as_str();
         match dir {
-            "north" | "n" | "forward" | "f" => return Some(Direction::North),
-            "south" | "s" | "backward" | "b" => return Some(Direction::South),
-            "east" | "e" | "right" | "r" => return Some(Direction::East),
-            "west" | "w" | "left" | "l" => return Some(Direction::West),
-            "up" | "u" | "upstairs" => return Some(Direction::Up),
-            "down" | "d" => return Some(Direction::Down),
-            "in" | "inside" => return Some(Direction::Enter),
-            "out" | "outside" => return Some(Direction::Exit),
-            &_ => return None,
+            "north" | "n" | "forward" | "f" => Some(Direction::North),
+            "south" | "s" | "backward" | "b" => Some(Direction::South),
+            "east" | "e" | "right" | "r" => Some(Direction::East),
+            "west" | "w" | "left" | "l" => Some(Direction::West),
+            "up" | "u" | "upstairs" => Some(Direction::Up),
+            "down" | "d" => Some(Direction::Down),
+            "in" | "inside" => Some(Direction::Enter),
+            "out" | "outside" => Some(Direction::Exit),
+            &_ => None,
         }
     }
 
     fn to_action(&self, token: Token, context: &GameContext) -> Action {
         let prsa = token.prsa.as_str();
         match prsa {
-            "i" | "inv" | "inventory" => return Action::Inventory,
-            "q" | "quit" => return Action::Quit,
-            "?" | "help" | "hint" => return Action::Help,
+            "i" | "inv" | "inventory" => Action::Inventory,
+            "q" | "quit" => Action::Quit,
+            "?" | "help" | "hint" => Action::Help,
             "g" | "go" | "ascend" | "climb" | "crawl" | "descend" | "run" | "travel" | "turn"
             | "skip" | "walk" => {
-                if token.prsi.is_some() {
-                    let prsi = token.prsi.unwrap();
-                    if let Some(direction) = self.to_direction(prsi.clone()) {
-                        return Action::Go(direction);
-                    } else {
-                        return Action::UnknownDirection(prsi);
-                    }
-                } else {
+                match token.prso {
                     // Room chooses direction, usually the only visible entrance or exit.
-                    return Action::Go(Direction::Exit);
+                    None => Action::Go(Direction::Exit),
+                    Some(dir) => {
+                        if let Some(direction) = self.to_direction(dir.clone()) {
+                            Action::Go(direction)
+                        } else {
+                            Action::UnknownDirection(dir)
+                        }
+                    }
                 }
             }
-            "wait" => return Action::Wait,
-            "enter" => return Action::Go(Direction::Enter),
-            "leave" | "exit" => return Action::Go(Direction::Exit),
-            _ => return self.to_direct_action(token, context),
+            "wait" => Action::Wait,
+            "enter" => Action::Go(Direction::Enter),
+            "leave" | "exit" => Action::Go(Direction::Exit),
+            _ => self.to_direct_action(token, context),
         }
     }
 
     // Parser parses the PRSA of the command and returns an Action enum.
     pub fn input_action(&self, context: &GameContext) -> Action {
         let token = self.input_command();
-        return self.to_action(token, context);
+        self.to_action(token, context)
     }
 }
 
@@ -255,14 +259,68 @@ mod tests {
         fn new(atlas: GameAtlas) -> Self {
             Self {
                 atlas,
-                obj: String::new(),
-                loc: String::new(),
+                obj: String::from(""),
+                loc: String::from(""),
+            }
+        }
+
+        fn unpack_action(&self, action: Action) -> (String, Option<String>, Option<String>) {
+            match action {
+                Action::Go(d) => match d {
+                    Direction::North => (String::from("go"), Some("north".to_string()), None),
+                    Direction::South => (String::from("go"), Some("south".to_string()), None),
+                    Direction::East => (String::from("go"), Some("east".to_string()), None),
+                    Direction::West => (String::from("go"), Some("west".to_string()), None),
+                    Direction::Up => (String::from("go"), Some("up".to_string()), None),
+                    Direction::Down => (String::from("go"), Some("down".to_string()), None),
+                    Direction::Exit => (String::from("go"), Some("exit".to_string()), None),
+                    Direction::Enter => (String::from("go"), Some("enter".to_string()), None),
+                },
+
+                Action::Climb(o) => (String::from("climb"), o, None),
+                Action::Describe(o) => (String::from("describe"), o, None),
+                Action::Examine(o) => (String::from("examine"), o, None),
+                Action::Follow(o) => (String::from("follow"), o, None),
+                Action::Listen(o) => (String::from("listen"), o, None),
+                Action::Take(o) => (String::from("take"), o, None),
+                Action::Attack(o, i) => (String::from("attack"), Some(o), i),
+                Action::Drop(o, i) => (String::from("drop"), Some(o), i),
+                Action::Light(o, i) => (String::from("light"), Some(o), i),
+                Action::Open(o, i) => (String::from("open"), Some(o), i),
+                Action::Read(o, i) => (String::from("read"), Some(o), i),
+                Action::Say(o, i) => (String::from("say"), Some(o), i),
+                Action::Use(o, i) => (String::from("use"), Some(o), i),
+
+                Action::Die => (String::from("die"), None, None),
+                Action::Help => (String::from("help"), None, None),
+                Action::Inventory => (String::from("inventory"), None, None),
+                Action::Wait => (String::from("wait"), None, None),
+                Action::Quit => (String::from("quit"), None, None),
+
+                Action::Arrive(o) => (String::from("arrive"), Some(o), None),
+                Action::Leave(o) => (String::from("leave"), Some(o), None),
+
+                Action::AmbiguousObject(mut v) => (String::from("ambiguousObj"), v.pop(), v.pop()),
+                Action::MissingTarget(a) => (String::from("missingTarget"), Some(a), None),
+                Action::UnknownAction(a) => (String::from("unknownAction"), Some(a), None),
+                Action::UnknownDirection(d) => (String::from("unknownDir"), Some(d), None),
+
+                _ => (String::from("other"), None, None),
             }
         }
 
         pub fn invoke(&mut self, action: Action) -> Handled {
             let mut handled = false;
-            if let Some(mut obj) = self.atlas.get_mut(self.obj.clone()) {
+            let (prsa, prso, prsi) = self.unpack_action(action.clone());
+
+            println!(
+                "prsa: {} prso: {} prsi: {}",
+                prsa,
+                prso.as_ref().map_or_else(|| "".to_string(), |s| s.clone()),
+                prsi.as_ref().map_or_else(|| "".to_string(), |s| s.clone())
+            );
+
+            if let Some(mut obj) = self.atlas.get_mut(prso.unwrap()) {
                 let notification = obj.act(action.clone());
                 match notification {
                     Notify::Handled => handled = true,
@@ -334,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_move() {
+    fn test_parser_move_knife() {
         let atlas = setup_kitchen();
         let parser = Parser::default();
         let sink = Some(String::from("sink"));

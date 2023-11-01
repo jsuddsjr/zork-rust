@@ -9,6 +9,13 @@ pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(GoldRing::new()));
 }
 
+pub static KITCHEN: &str = "kitchen";
+pub static SINK: &str = "sink";
+pub static KNIFE: &str = "knife";
+pub static BREADBOX: &str = "breadbox";
+pub static BREAD: &str = "bread";
+pub static GOLDRING: &str = "gold ring";
+
 #[derive(Default)]
 pub struct Kitchen {
     name: String,
@@ -18,7 +25,7 @@ pub struct Kitchen {
 impl Kitchen {
     pub fn new() -> Self {
         Self {
-            name: "kitchen".to_string(),
+            name: KITCHEN.to_string(),
             seen: false,
         }
     }
@@ -67,8 +74,8 @@ pub struct Sink {
 impl Sink {
     pub fn new() -> Self {
         Self {
-            name: "sink".to_string(),
-            loc: Kitchen::default().name(),
+            name: SINK.to_string(),
+            loc: KITCHEN.to_string(),
             holds_knife: true,
         }
     }
@@ -112,8 +119,8 @@ pub struct Knife {
 impl Knife {
     pub fn new() -> Self {
         Self {
-            name: "knife".to_string(),
-            loc: Sink::default().name(),
+            name: KNIFE.to_string(),
+            loc: SINK.to_string(),
         }
     }
 }
@@ -133,6 +140,8 @@ impl GameObject for Knife {
 
     fn can_do(&self, action: &Action) -> bool {
         match action {
+            Action::Describe(_) => true,
+            Action::Examine(_) => true,
             Action::Take(_) => true,
             Action::Use(_, _) => true,
             Action::Attack(_, _) => true,
@@ -147,7 +156,7 @@ impl GameObject for Knife {
                 Notify::Handled
             }
             Action::Examine(_) => {
-                println!("It won't slay a dragon, but it might work on bread.");
+                println!("This blade won't slay a dragon, but it might work on bread.");
                 Notify::Handled
             }
             Action::Take(_) => {
@@ -157,9 +166,9 @@ impl GameObject for Knife {
                 Notify::Move(self.name(), Location::Inventory)
             }
             Action::Use(target, _) | Action::Attack(target, _) => {
-                if target == Bread::default().name() {
+                if target.as_str() == BREAD {
                     println!("You hack the crusty loaf clean in two. Take that you vile loaf!!");
-                    Notify::Move(GoldRing::default().name(), Location::Local)
+                    Notify::Move(GOLDRING.to_string(), Location::Local)
                 } else {
                     println!("Are you serious? You can't use a knife on that.");
                     Notify::Handled
@@ -180,8 +189,8 @@ pub struct BreadBox {
 impl BreadBox {
     pub fn new() -> Self {
         Self {
-            name: "breadbox".to_string(),
-            loc: Kitchen::default().name(),
+            name: BREADBOX.to_string(),
+            loc: KITCHEN.to_string(),
             unlocked: false,
         }
     }
@@ -196,6 +205,15 @@ impl GameObject for BreadBox {
         self.loc.clone()
     }
 
+    fn can_do(&self, action: &Action) -> bool {
+        match action {
+            Action::Describe(_) => true,
+            Action::Examine(_) => true,
+            Action::Open(_, _) => true,
+            _ => false,
+        }
+    }
+
     fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Describe(_) => {
@@ -204,6 +222,15 @@ impl GameObject for BreadBox {
                 } else {
                     println!("A breadbox.");
                 }
+                Notify::Handled
+            }
+            Action::Examine(_) => {
+                if self.unlocked {
+                    println!("It's an empty breadbox.");
+                } else {
+                    println!("You give the breadbox a shake and something heavy and hard rattles inside.\nUnfortunately, you can't see what it is because the breadbox is locked.");
+                }
+                println!("It's a breadbox.");
                 Notify::Handled
             }
             Action::Open(_, with) => match with {
@@ -226,23 +253,7 @@ impl GameObject for BreadBox {
                     }
                 }
             },
-            Action::Examine(_) => {
-                if self.unlocked {
-                    println!("It's an empty breadbox.");
-                } else {
-                    println!("You give the breadbox a shake and something heavy and hard rattles inside.\nUnfortunately, you can't see what it is because the breadbox is locked.");
-                }
-                println!("It's a breadbox.");
-                Notify::Handled
-            }
             _ => Notify::Unhandled,
-        }
-    }
-
-    fn can_do(&self, action: &Action) -> bool {
-        match action {
-            Action::Open(_, _) => true,
-            _ => false,
         }
     }
 }
@@ -256,8 +267,8 @@ pub struct Bread {
 impl Bread {
     pub fn new() -> Self {
         Self {
-            name: "bread".to_string(),
-            loc: Kitchen::default().name(),
+            name: BREAD.to_string(),
+            loc: KITCHEN.to_string(),
         }
     }
 }
@@ -273,6 +284,8 @@ impl GameObject for Bread {
 
     fn can_do(&self, action: &Action) -> bool {
         match action {
+            Action::Describe(_) => true,
+            Action::Examine(_) => true,
             Action::Take(_) => true,
             Action::Attack(_, _) => true,
             _ => false,
@@ -294,10 +307,9 @@ impl GameObject for Bread {
                 Notify::Move(self.name(), Location::Inventory)
             }
             Action::Attack(_, attacker) => {
-                if attacker.is_none() {
-                    println!("You punch the bread and scrape your knuckles badly. Ouch!");
-                } else {
-                    println!("The loaf resists the {}.", attacker.unwrap());
+                match attacker {
+                    None => println!("You punch the bread and scrape your knuckles badly. Ouch!"),
+                    Some(attacker) => println!("The loaf resists the {}.", attacker),
                 }
                 Notify::Handled
             }
@@ -316,8 +328,8 @@ struct GoldRing {
 impl GoldRing {
     pub fn new() -> Self {
         Self {
-            name: "gold ring".to_string(),
-            loc: Bread::default().name(),
+            name: GOLDRING.to_string(),
+            loc: BREAD.to_string(),
             seen: false,
         }
     }
@@ -338,6 +350,8 @@ impl GameObject for GoldRing {
 
     fn can_do(&self, action: &Action) -> bool {
         match action {
+            Action::Describe(_) => true,
+            Action::Examine(_) => true,
             Action::Take(_) => true,
             _ => false,
         }

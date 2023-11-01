@@ -3,7 +3,7 @@ pub mod objects;
 pub mod parser;
 pub mod title;
 
-pub use game::{Game, GameAtlas, GameContext};
+pub use game::{Game, GameAtlas, GameContext, NOWHERE};
 pub use objects::forest::{Forest, Key, Leaves};
 pub use objects::kitchen::{Bread, BreadBox, Kitchen, Knife, Sink};
 pub use parser::Token;
@@ -86,18 +86,23 @@ pub enum Notify {
 
 #[allow(unused_variables)]
 pub trait GameObject {
+    /// Get the name of this object. Required.
     fn name(&self) -> String;
 
+    /// Get the location of this object. Default is NOWHERE.
     fn loc(&self) -> String {
-        String::from("nowhere")
+        String::from(NOWHERE)
     }
 
+    /// Set a new location. Default is to do nothing.
     fn set_loc(&mut self, loc: String) {}
 
+    /// Can this object do this action? Default is true.
     fn can_do(&self, action: &Action) -> bool {
-        false
+        true
     }
 
+    /// Handle an action. Default is unhandled.
     fn act(&mut self, action: Action) -> Notify {
         Notify::Unhandled
     }

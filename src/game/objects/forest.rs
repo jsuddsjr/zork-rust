@@ -14,16 +14,6 @@ impl GameObject for Forest {
         "forest".to_string()
     }
 
-    fn can_do(&self, action: &Action) -> bool {
-        match action {
-            Action::Go(Direction::North) => true,
-            Action::Describe(_) => true,
-            Action::Arrive(_) => true,
-            Action::Examine(_) => true,
-            _ => false,
-        }
-    }
-
     fn act(&mut self, action: Action) -> Notify {
         match action {
             Action::Go(Direction::North) => {
