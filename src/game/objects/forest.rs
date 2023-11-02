@@ -1,4 +1,4 @@
-use crate::game::{Action, Direction, GameObject, Location, Notify};
+use crate::game::{objects::kitchen::KITCHEN, Action, Direction, GameObject, Location, Notify};
 
 pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(Forest::default()));
@@ -6,30 +6,38 @@ pub fn create(vec: &mut Vec<Box<dyn GameObject>>) {
     vec.push(Box::new(Key::new()));
 }
 
+pub static FOREST: &str = "forest";
+pub static LEAVES: &str = "leaves";
+pub static KEY: &str = "key";
+
 #[derive(Default)]
 pub struct Forest;
 
 impl GameObject for Forest {
     fn name(&self) -> String {
-        "forest".to_string()
+        FOREST.to_string()
     }
 
     fn act(&mut self, action: Action) -> Notify {
         match action {
-            Action::Go(Direction::North) => {
+            Action::Go(Direction::North) | Action::Go(Direction::Exit) => {
                 println!("You follow the path north.");
-                Notify::Set(Location::To("kitchen".to_string()))
+                Notify::Set(Location::To(KITCHEN.to_string()))
             }
             Action::Describe(_) => {
                 println!("You find yourself standing in a forest clearing, surrounded by trees. There is a path to the north.");
-                Notify::Unhandled
+                Notify::Handled
             }
             Action::Arrive(_) => {
                 println!("The fog clears...");
                 Notify::Handled
             }
+            Action::Leave(_) => {
+                println!("The peaceful rustling leaves recede into the distance...");
+                Notify::Handled
+            }
             Action::Examine(_) => {
-                println!("One of the trees nearby has been carved with the inscription: C+J.");
+                println!("One of the trees nearby has been carved with the inscription: C+J. You wonder what it means.");
                 Notify::Handled
             }
             _ => Notify::Unhandled,
@@ -50,17 +58,18 @@ impl Leaves {
 
 impl GameObject for Leaves {
     fn name(&self) -> String {
-        "leaves".to_string()
+        LEAVES.to_string()
     }
 
     fn loc(&self) -> String {
-        Forest::default().name()
+        FOREST.to_string()
     }
 
     fn can_do(&self, action: &Action) -> bool {
         match action {
             Action::Describe(_) => true,
             Action::Attack(_, _) => true,
+            Action::Take(_) => true,
             _ => false,
         }
     }
@@ -69,17 +78,20 @@ impl GameObject for Leaves {
         match action {
             Action::Describe(_) => {
                 println!("There's a pile of leaves here.");
-                Notify::Unhandled
+                Notify::Handled
             }
             Action::Attack(_, _) => {
+                println!("The leaves flutter and fly as you kick through them.");
                 if self.contains_key {
-                    println!("You uncover a key hidden in the leaves.");
                     self.contains_key = false;
-                    Notify::Move("key".to_string(), Location::Local)
+                    Notify::Move(KEY.to_string(), Location::Local)
                 } else {
-                    println!("The leaves flutter and fly as you kick through them.");
                     Notify::Handled
                 }
+            }
+            Action::Take(_) => {
+                println!("You take a handful of leaves and throw them in the air. Feel better?");
+                Notify::Handled
             }
             _ => Notify::Unhandled,
         }
@@ -94,18 +106,18 @@ pub struct Key {
 impl Key {
     pub fn new() -> Self {
         Self {
-            loc: Leaves::default().name(),
+            loc: LEAVES.to_string(),
         }
     }
 }
 
 impl GameObject for Key {
     fn name(&self) -> String {
-        "key".to_string()
+        KEY.to_string()
     }
 
     fn loc(&self) -> String {
-        Leaves::default().name()
+        self.loc.clone()
     }
 
     fn set_loc(&mut self, loc: String) {
@@ -124,7 +136,7 @@ impl GameObject for Key {
         match action {
             Action::Describe(_) => {
                 println!("A shiny key glints in the grass.");
-                Notify::Unhandled
+                Notify::Handled
             }
             Action::Take(_) => {
                 println!("You take the key.");

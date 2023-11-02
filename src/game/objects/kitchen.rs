@@ -38,12 +38,12 @@ impl GameObject for Kitchen {
 
     fn act(&mut self, action: Action) -> Notify {
         return match action {
-            Action::Arrive(_) => {
+            Action::Describe(_) => {
                 if !self.seen {
                     println!("You are in a kitchen. The dishes are piled in the sink. The refrigerator is empty. There is a breadbox on the counter.");
                     self.seen = true;
                 } else {
-                    println!("You are in a kitchen. The dishes are still piled in the sink. The refrigerator is still empty. The breadbox is still on the counter.");
+                    println!("You are in a kitchen. The dishes are STILL piled in the sink. The refrigerator is STILL empty. The breadbox is STILL on the counter.");
                 }
                 Notify::Handled
             }
@@ -51,12 +51,16 @@ impl GameObject for Kitchen {
                 println!("You hear the faint buzzing of flies and a slow drip into the sink.");
                 Notify::Handled
             }
-            Action::Describe(_) => {
-                println!("You are in a kitchen. It's a mess.");
+            Action::Examine(_) => {
+                println!("You are in a kitchen. It's a mess. Whoever lives here is a slob.");
                 Notify::Handled
             }
-            Action::Leave(_) | Action::Go(Direction::Exit) => {
+            Action::Leave(_) => {
                 println!("You head toward fresher air.");
+                Notify::Handled
+            }
+            Action::Go(Direction::Exit) => {
+                println!("It's better alternative than doing the dishes.");
                 Notify::Set(Location::To("forest".to_string()))
             }
             _ => Notify::Unhandled,
@@ -156,7 +160,7 @@ impl GameObject for Knife {
                 Notify::Handled
             }
             Action::Examine(_) => {
-                println!("This blade won't slay a dragon, but it might work on bread.");
+                println!("It won't slay a dragon, but it might work on bread.");
                 Notify::Handled
             }
             Action::Take(_) => {
@@ -268,7 +272,7 @@ impl Bread {
     pub fn new() -> Self {
         Self {
             name: BREAD.to_string(),
-            loc: KITCHEN.to_string(),
+            loc: BREADBOX.to_string(),
         }
     }
 }
@@ -288,6 +292,7 @@ impl GameObject for Bread {
             Action::Examine(_) => true,
             Action::Take(_) => true,
             Action::Attack(_, _) => true,
+            Action::Use(_, _) => true,
             _ => false,
         }
     }
@@ -310,6 +315,13 @@ impl GameObject for Bread {
                 match attacker {
                     None => println!("You punch the bread and scrape your knuckles badly. Ouch!"),
                     Some(attacker) => println!("The loaf resists the {}.", attacker),
+                }
+                Notify::Handled
+            }
+            Action::Use(_, knife) => {
+                match knife {
+                    None => println!("You try to use the bread, but it's too crusty."),
+                    Some(knife) => println!("You use the {} on the bread, but it's too crusty. Maybe try again with a little more force?", knife),
                 }
                 Notify::Handled
             }
