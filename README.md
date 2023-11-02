@@ -2,7 +2,7 @@
 
 > WARNING: This is a work in progress.
 
-So, I decided to try my hand at Rust. I gave myself two weeks to build a Zork-like game engine. Although the objecs are built-in, I wanted to mimic the open-ended text-based experience of the Zork universe. Having never done any Rust programming, I thought, "how hard could it be?" *Very*, as it turned out.
+So, I decided to try my hand at Rust. I gave myself two weeks to build a Zork-like game engine. Although the objects are built-in, I wanted to mimic the open-ended text-based experience of the Zork universe. Having never done any Rust programming, I thought, "how hard could it be?" *Very*, as it turned out.
 
 Let's start with the good stuff.
 
@@ -12,6 +12,8 @@ Let's start with the good stuff.
 * Rust adds memory management concepts like "ownership" and "borrowing" so that it can manage your memory without a garbage collector.
 
 It's this last point that got me into trouble.
+
+
 
 ## Objects vs. Traits.
 
@@ -55,19 +57,9 @@ argument requires that `'1` must outlive `'static`
 
 According to A lifetime is a bit of metadata that allows you and the compiler to know how long a value will be valid at its current memory location. That's an important distinction, as it's a common mistake Rust newcomers make. Rust lifetimes are not the time period between when an object is created and when it is destroyed!
 
-
-
-{Provide a description of the software that you wrote to demonstrate the Rust language.}
-
-{Describe your purpose for writing this software.}
-
-{Provide a link to your YouTube demonstration. It should be a 4-5 minute demo of the software running and a walkthrough of the code. Focus should be on sharing what you learned about the language syntax.}
-
-[Software Demo Video](http://youtube.link.goes.here)
-
 # Development Environment
 
-I highly recommend the VS
+I highly recommend the VS Code extension from Microsoft for Rust.
 
 {Describe the programming language that you used and any libraries.}
 
@@ -91,6 +83,6 @@ Obviously, working code would be ideal. I am sorry to say that is not yet the ca
 
 Once that blessed day has come, here's a few more things I want to do:
 
-- **Flesh out the entire game.** There's more things than forests and kichens, ya know.
+- **Flesh out the entire game.** There's more things than forests and kitchens, ya know.
 - **Mini games** The keypad on the garden gate has it's own unique interaction.
 - **Save/Load game progress** So you don't have to complete the game in one sitting.
